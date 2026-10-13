@@ -1,4 +1,5 @@
 import { translate as t } from '../lib/i18n'
+import { ActingDepartmentSelector } from '../components/ActingDepartmentSelector'
 import { AppIcon, type AppIconName } from '../components/ui/AppIcon'
 import { RoleBadge } from '../components/ui/RoleBadge'
 import type { AuthenticatedUser } from '../lib/auth'
@@ -87,6 +88,7 @@ function renderModule(
           locationSearch={currentSearch}
           onNavigate={onNavigate}
           onSessionExpired={onSessionExpired}
+          onUserUpdated={onUserUpdated}
           user={user}
         />
       )
@@ -174,6 +176,8 @@ export function AppShellPage({
           <span className="workspace-sidebar__role-label">{t("Current role", "Rol actual")}</span>
           <RoleBadge className="workspace-sidebar__role-value" role={user.role} />
         </section>
+
+        <ActingDepartmentSelector departments={user.departments ?? []} />
 
         <nav aria-label={t("App navigation", "Navegación de la aplicación")} className="workspace-nav">
           {(['internal', 'migrant'] as AppWorkspace[]).map((workspace) => {

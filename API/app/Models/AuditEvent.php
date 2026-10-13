@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
     'occurred_at',
     'actor_user_id',
     'actor_role',
+    'acting_department',
     'event_type',
     'resource_type',
     'resource_id',

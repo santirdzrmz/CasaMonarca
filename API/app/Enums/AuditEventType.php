@@ -58,6 +58,8 @@ enum AuditEventType: string
     case AuthPasswordResetCompleted = 'auth.password_reset.completed';
     case AuthPasswordResetFailed = 'auth.password_reset.failed';
     case AdminUserStatusChangeChallengeStarted = 'admin.user.status_change.challenge.started';
+    case AdminUserDepartmentsChanged = 'admin.user.departments_changed';
+    case AuthActingDepartmentDenied = 'auth.acting_department.denied';
     case AdminUserEnabled = 'admin.user.enabled';
     case AdminUserDisabled = 'admin.user.disabled';
     case AdminPolicySignatureValidityChanged = 'admin.policy.signature_validity_changed';

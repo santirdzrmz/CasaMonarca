@@ -3,8 +3,11 @@ import { createRoot } from 'react-dom/client'
 
 import App from './App.tsx'
 import { LanguageSwitcher } from './components/ui/LanguageSwitcher.tsx'
+import { installActingDepartmentHeader } from './lib/departments.ts'
 import { translate as t } from './lib/i18n.ts'
 import './index.css'
+
+installActingDepartmentHeader()
 
 const rootElement = document.getElementById('root')
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureAccountActive;
+use App\Http\Middleware\RequireActingDepartment;
 use App\Http\Middleware\RequireFeatureEnabled;
 use App\Http\Middleware\RequireRole;
 use App\Http\Middleware\RequireSecurityEnrollment;
@@ -44,6 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'requireActiveAccount' => EnsureAccountActive::class,
+            'requireDepartment' => RequireActingDepartment::class,
             'requireFeature' => RequireFeatureEnabled::class,
             'requireRole' => RequireRole::class,
             'requireSecurityEnrollment' => RequireSecurityEnrollment::class,

@@ -4,6 +4,8 @@ namespace App\Services\Security;
 
 use App\Enums\AuditEventOutcome;
 use App\Enums\AuditEventType;
+use App\Enums\Department;
+use App\Http\Middleware\RequireActingDepartment;
 use App\Models\AuditEvent;
 use App\Models\SecurityChallengeIntent;
 use App\Models\User;
@@ -25,6 +27,12 @@ class SecurityChallengeIntentService
         ?string $targetType = null,
         int|string|null $targetId = null,
     ): SecurityChallengeIntent {
+        $actingDepartment = request()->attributes->get(RequireActingDepartment::ATTRIBUTE);
+
+        if ($actingDepartment instanceof Department) {
+            $payload['actingDepartment'] = $actingDepartment->value;
+        }
+
         return SecurityChallengeIntent::query()->create([
             'purpose' => $purpose,
             'status' => SecurityChallengeIntent::STATUS_PENDING,
@@ -137,6 +145,7 @@ class SecurityChallengeIntentService
             'occurred_at' => now('UTC'),
             'actor_user_id' => $intent->actor_user_id,
             'actor_role' => $intent->actor?->role?->value,
+            'acting_department' => data_get($intent->payload, 'actingDepartment'),
             'event_type' => $eventType->value,
             'resource_type' => $intent->target_type,
             'resource_id' => $intent->target_id,

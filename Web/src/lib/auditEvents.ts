@@ -2,6 +2,7 @@ import { translate as t } from './i18n'
 import { apiFetch } from './api'
 
 export type AuditEventActor = {
+  department?: string | null
   email?: string | null
   name?: string | null
   role?: string | null
@@ -51,6 +52,7 @@ export type AuditEventListResponse = {
 
 export type AuditEventQuery = {
   category?: AuditEventCategory
+  department?: string
   limit?: number
   outcome?: AuditEventSummary['outcome']
   page?: number
@@ -104,6 +106,7 @@ const normalizeAuditEvent = (
 
   return {
     actor: {
+      department: asNullableString(actor.department),
       email: asNullableString(actor.email),
       name: asNullableString(actor.name),
       role: asNullableString(actor.role),
@@ -182,6 +185,7 @@ const normalizeAuditEventListResponse = (
 
 export async function getAuditEvents({
   category,
+  department,
   limit = DEFAULT_AUDIT_LIMIT,
   outcome,
   page = 1,
@@ -189,6 +193,7 @@ export async function getAuditEvents({
 }: AuditEventQuery = {}): Promise<AuditEventListResponse> {
   const query = {
     category,
+    department,
     limit,
     outcome,
     page,
@@ -205,6 +210,10 @@ export async function getAuditEvents({
 
   if (outcome) {
     params.set('outcome', outcome)
+  }
+
+  if (department) {
+    params.set('department', department)
   }
 
   if (q?.trim()) {

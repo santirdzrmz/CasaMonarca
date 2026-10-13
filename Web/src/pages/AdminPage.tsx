@@ -1,5 +1,6 @@
 import { translate as t } from '../lib/i18n'
-import type { AuthenticatedUser } from '../lib/auth'
+import { getCurrentUser, type AuthenticatedUser } from '../lib/auth'
+import { AdminUserDepartmentsEditor } from '../components/AdminUserDepartmentsEditor'
 import { AppIcon } from '../components/ui/AppIcon'
 import { RoleBadge } from '../components/ui/RoleBadge'
 import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -42,6 +43,7 @@ type AdminPageProps = {
   locationSearch?: string
   onNavigate?: (to: string) => void
   onSessionExpired?: () => void
+  onUserUpdated?: (user: AuthenticatedUser) => void
   user: AuthenticatedUser
 }
 
@@ -397,7 +399,7 @@ const buildSigningLedgerGraph = (
   }
 }
 
-export function AdminPage({ locationSearch, onNavigate, onSessionExpired, user }: AdminPageProps) {
+export function AdminPage({ locationSearch, onNavigate, onSessionExpired, onUserUpdated, user }: AdminPageProps) {
   const adminQuery = useMemo(() => new URLSearchParams(locationSearch ?? ''), [locationSearch])
   const requestedTabParam = adminQuery.get('tab')
   const requestedAdminTab = isAdminTabId(requestedTabParam) ? requestedTabParam : null
@@ -2204,6 +2206,26 @@ export function AdminPage({ locationSearch, onNavigate, onSessionExpired, user }
                   <p className="admin-role-assignment__note admin-role-assignment__note--warning">
                     {t("Coordinator promotion requires the target user to register a passkey first. ", "La promoción a coordinación requiere que el usuario destino registre primero una llave de acceso. ")}</p>
                 ) : null}
+
+                <AdminUserDepartmentsEditor
+                  account={account}
+                  isSelf={account.id === user.id}
+                  key={`${account.id}:${(account.departments ?? []).join(',')}`}
+                  onUpdated={(updatedAccount) => {
+                    setDirectory((currentDirectory) =>
+                      currentDirectory.map((currentAccount) =>
+                        currentAccount.id === updatedAccount.id ? updatedAccount : currentAccount,
+                      ),
+                    )
+
+                    // `user` may carry the dev role override; reload the real account instead.
+                    if (updatedAccount.id === user.id && onUserUpdated) {
+                      void getCurrentUser()
+                        .then((response) => onUserUpdated(response.user))
+                        .catch(() => undefined)
+                    }
+                  }}
+                />
 
                 <div className="admin-recovery-actions" aria-label={t(`${account.name} recovery and status controls`, `Controles de recuperación y estado de ${account.name}`)}>
                   <button

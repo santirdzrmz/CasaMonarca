@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api\Audit;
 
+use App\Enums\Department;
 use App\Http\Controllers\Controller;
 use App\Models\AuditEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class AuditEventIndexController extends Controller
 {
@@ -13,6 +15,7 @@ class AuditEventIndexController extends Controller
     {
         $validated = $request->validate([
             'category' => ['nullable', 'string', 'in:account,admin,auth,document,security,vcs'],
+            'department' => ['nullable', 'string', Rule::enum(Department::class)],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'outcome' => ['nullable', 'string', 'in:denied,failure,success'],
             'page' => ['nullable', 'integer', 'min:1'],
@@ -34,6 +37,10 @@ class AuditEventIndexController extends Controller
 
         if (is_string($outcome)) {
             $query->where('outcome', $outcome);
+        }
+
+        if (is_string($validated['department'] ?? null)) {
+            $query->where('acting_department', $validated['department']);
         }
 
         if ($search !== '') {
@@ -91,6 +98,7 @@ class AuditEventIndexController extends Controller
                         'name' => $event->actor?->name,
                         'email' => $event->actor?->email,
                         'role' => $event->actor_role,
+                        'department' => $event->acting_department,
                     ],
                     'resource' => [
                         'type' => $event->resource_type,

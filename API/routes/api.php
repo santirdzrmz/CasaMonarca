@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Admin\MigrantSigningLedgerController;
 use App\Http\Controllers\Api\Admin\SigningLedgerController;
 use App\Http\Controllers\Api\Admin\UserCurpUpdateOptionsController;
 use App\Http\Controllers\Api\Admin\UserCurpUpdateVerifyController;
+use App\Http\Controllers\Api\Admin\UserDepartmentsUpdateController;
 use App\Http\Controllers\Api\Admin\UserIndexController;
 use App\Http\Controllers\Api\Admin\UserRecoveryOptionsController;
 use App\Http\Controllers\Api\Admin\UserRecoveryVerifyController;
@@ -97,7 +98,7 @@ Route::middleware('web')->group(function (): void {
     Route::post('/webauthn/register/verify', WebauthnRegistrationVerifyController::class)->middleware(['auth', 'requireActiveAccount']);
     Route::post('/security-challenges/{intent}/cancel', SecurityChallengeCancelController::class)->middleware(['auth', 'requireActiveAccount']);
 
-    Route::middleware(['auth', 'requireActiveAccount', 'requireRole:admin'])->group(function (): void {
+    Route::middleware(['auth', 'requireActiveAccount', 'requireDepartment', 'requireRole:admin'])->group(function (): void {
         Route::get('/admin/authorization-check', AdminAuthorizationCheckController::class);
         Route::get('/admin/users', UserIndexController::class);
         Route::post('/admin/users/{user}/curp/options', UserCurpUpdateOptionsController::class)->middleware('throttle:30,1');
@@ -110,6 +111,7 @@ Route::middleware('web')->group(function (): void {
         Route::post('/admin/users/{user}/role/verify', UserRoleUpdateVerifyController::class)->middleware('throttle:30,1');
         Route::post('/admin/users/{user}/status/options', UserStatusUpdateOptionsController::class)->middleware('throttle:30,1');
         Route::post('/admin/users/{user}/status/verify', UserStatusUpdateVerifyController::class)->middleware('throttle:30,1');
+        Route::put('/admin/users/{user}/departments', UserDepartmentsUpdateController::class)->middleware(['requireSecurityEnrollment', 'throttle:30,1']);
         Route::get('/admin/verification-package-signing-key', VerificationPackageSigningKeyController::class);
         Route::post('/admin/verification-package-signing-key/rotation/options', VerificationPackageSigningKeyRotationOptionsController::class)->middleware('throttle:10,1');
         Route::post('/admin/verification-package-signing-key/rotation/verify', VerificationPackageSigningKeyRotationVerifyController::class)->middleware('throttle:10,1');
@@ -120,11 +122,11 @@ Route::middleware('web')->group(function (): void {
             ->middleware('requireSecurityEnrollment');
     });
 
-    Route::middleware(['auth', 'requireActiveAccount', 'requireSecurityEnrollment', 'requireRole:admin,coordinator,non_coordinator,volunteer'])->group(function (): void {
+    Route::middleware(['auth', 'requireActiveAccount', 'requireSecurityEnrollment', 'requireDepartment', 'requireRole:admin,coordinator,non_coordinator,volunteer'])->group(function (): void {
         Route::post('/documents', DocumentStoreController::class);
     });
 
-    Route::middleware(['auth', 'requireActiveAccount', 'requireSecurityEnrollment', 'requireRole:admin,coordinator,non_coordinator'])->group(function (): void {
+    Route::middleware(['auth', 'requireActiveAccount', 'requireSecurityEnrollment', 'requireDepartment', 'requireRole:admin,coordinator,non_coordinator'])->group(function (): void {
         Route::get('/documents', DocumentIndexController::class);
         Route::get('/documents/{document}', DocumentShowController::class);
         Route::get('/documents/{document}/download', DocumentDownloadController::class);
@@ -138,7 +140,7 @@ Route::middleware('web')->group(function (): void {
         Route::get('/documents/{document}/revisions/{revision}/verification-package', DocumentVerificationPackageController::class);
     });
 
-    Route::middleware(['auth', 'requireActiveAccount', 'requireSecurityEnrollment', 'requireRole:admin,coordinator'])->group(function (): void {
+    Route::middleware(['auth', 'requireActiveAccount', 'requireSecurityEnrollment', 'requireDepartment', 'requireRole:admin,coordinator'])->group(function (): void {
         Route::get('/admin/invites', AccountInviteIndexController::class);
         Route::post('/documents/{document}/revisions/options', DocumentRevisionUpdateOptionsController::class);
         Route::post('/documents/{document}/revisions/verify', DocumentRevisionUpdateVerifyController::class);
@@ -152,12 +154,12 @@ Route::middleware('web')->group(function (): void {
         Route::post('/admin/invites/{invite}/revoke', AccountInviteRevokeController::class)->middleware('throttle:30,1');
     });
 
-    Route::middleware(['auth', 'requireActiveAccount', 'requireRole:admin'])->group(function (): void {
+    Route::middleware(['auth', 'requireActiveAccount', 'requireDepartment', 'requireRole:admin'])->group(function (): void {
         Route::post('/documents/{document}/delete/options', DocumentDeleteOptionsController::class);
         Route::post('/documents/{document}/delete/verify', DocumentDeleteVerifyController::class);
     });
 
-    Route::middleware(['auth', 'requireActiveAccount', 'requireSecurityEnrollment', 'requireRole:admin,coordinator,non_coordinator,volunteer'])->prefix('registry/migrants')->group(function (): void {
+    Route::middleware(['auth', 'requireActiveAccount', 'requireSecurityEnrollment', 'requireDepartment', 'requireRole:admin,coordinator,non_coordinator,volunteer'])->prefix('registry/migrants')->group(function (): void {
         Route::get('/', [MigrantRegistryController::class, 'index']);
         Route::post('/', [MigrantRegistryController::class, 'store']);
         Route::get('/corrections', [MigrantRegistryController::class, 'corrections']);
@@ -188,7 +190,8 @@ Route::middleware('web')->group(function (): void {
                 Route::get('/', [MigrantRegistryDocumentController::class, 'index']);
             });
 
-            Route::middleware('requireRole:admin,coordinator,non_coordinator')->group(function (): void {
+            // Downloads use POST for the passkey challenge but change nothing.
+            Route::middleware('requireRole:admin,coordinator,non_coordinator')->withoutMiddleware('requireDepartment')->group(function (): void {
                 Route::post('/{migrantRegistryDocument}/download/options', MigrantRegistryDocumentDownloadOptionsController::class);
                 Route::post('/{migrantRegistryDocument}/download/verify', MigrantRegistryDocumentDownloadVerifyController::class);
             });
@@ -209,7 +212,7 @@ Route::middleware('web')->group(function (): void {
             Route::post('/{migrantRegistryEntry}/approval/verify', MigrantRegistryApprovalVerifyController::class);
         });
 
-        Route::middleware('requireRole:admin')->group(function (): void {
+        Route::middleware('requireRole:admin')->withoutMiddleware('requireDepartment')->group(function (): void {
             Route::post('/{migrantRegistryEntry}/pdf/options', MigrantRegistryPdfDownloadOptionsController::class);
             Route::post('/{migrantRegistryEntry}/pdf/verify', MigrantRegistryPdfDownloadVerifyController::class);
         });

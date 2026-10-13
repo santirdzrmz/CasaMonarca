@@ -366,6 +366,29 @@
   font-size: 0.82rem;
 }
 
+.acting-department__select {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(19, 35, 58, 0.18);
+  border-radius: 0.6rem;
+  background: #fffdf8;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.acting-department__notice {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: rgba(19, 35, 58, 0.72);
+}
+
+.acting-department__notice--warning {
+  color: #8a2b22;
+  font-weight: 600;
+}
+
 .role-badge {
   --role-accent: #1e4f89;
   --role-tint: rgba(30, 79, 137, 0.12);
@@ -866,6 +889,49 @@
 .audit-actor-role {
   display: inline-flex;
   min-width: max-content;
+}
+
+.audit-actor-department {
+  display: inline-flex;
+  min-width: max-content;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(143, 83, 8, 0.1);
+  color: #8f5308;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.admin-departments {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0.8rem 0 0;
+  border: 0;
+  border-top: 1px solid rgba(19, 35, 58, 0.1);
+}
+
+.admin-departments legend {
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.admin-departments__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.35rem 0.8rem;
+}
+
+.admin-departments__option {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.86rem;
+}
+
+.admin-departments .admin-role-assignment__button {
+  justify-self: start;
 }
 
 .audit-badge {

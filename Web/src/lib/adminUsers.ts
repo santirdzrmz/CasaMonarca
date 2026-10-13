@@ -33,6 +33,7 @@ export type AdminUserSummary = {
     count: number
     recent: AdminUserDevice[]
   }
+  departments?: string[]
   email: string
   emailVerifiedAt?: string | null
   enrollment: AdminUserEnrollment
@@ -285,6 +286,27 @@ export function getAdminUsers(limit = 50): Promise<AdminUserListResponse> {
   })
 
   return apiFetch<AdminUserListResponse>(`/admin/users?${params.toString()}`)
+}
+
+export type AdminUserDepartmentsUpdateResponse = {
+  message: string
+  user: AdminUserSummary
+}
+
+export async function updateAdminUserDepartments(
+  userId: number,
+  departments: string[],
+): Promise<AdminUserDepartmentsUpdateResponse> {
+  const { csrfToken } = await getCsrfToken()
+
+  return apiFetch<AdminUserDepartmentsUpdateResponse>(`/admin/users/${userId}/departments`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': csrfToken,
+    },
+    body: JSON.stringify({ departments }),
+  })
 }
 
 export async function startAdminUserRecovery(

@@ -126,6 +126,7 @@ export type AuthenticatedUser = {
     modules: SessionModuleCapabilities
     security: SessionSecurityCapabilities
   }
+  departments?: string[]
   id: number
   email: string
   name: string

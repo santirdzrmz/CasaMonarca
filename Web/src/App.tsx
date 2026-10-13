@@ -17,6 +17,7 @@ import {
 import { appChannel } from './config/env'
 import { ApiRequestError } from './lib/api'
 import { getCurrentUser, type AuthenticatedUser, type UserRole } from './lib/auth'
+import { syncActingDepartment } from './lib/departments'
 import { AppShellPage } from './pages/AppShellPage'
 import { ForbiddenPage } from './pages/ForbiddenPage'
 import { LoginPage } from './pages/LoginPage'
@@ -450,6 +451,17 @@ function App() {
 
     window.localStorage.setItem(DEV_ROLE_OVERRIDE_STORAGE_KEY, devRoleOverride)
   }, [devRoleOverride])
+
+  // The API validates departments against the real account, never the dev role override.
+  const authenticatedUserId = authState.user?.id ?? null
+  const assignedDepartmentsKey = (authState.user?.departments ?? []).join(',')
+
+  useEffect(() => {
+    syncActingDepartment(
+      authenticatedUserId,
+      assignedDepartmentsKey === '' ? [] : assignedDepartmentsKey.split(','),
+    )
+  }, [authenticatedUserId, assignedDepartmentsKey])
 
   const navigate = useCallback(
     (to: string, options?: { replace?: boolean }) => {
