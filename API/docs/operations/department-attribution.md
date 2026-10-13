@@ -164,16 +164,14 @@ php artisan users:departments <email> legal --replace         # reemplazar
 | Web — `eslint` en archivos tocados | Sin errores. |
 | Web — `vitest run` | 15 archivos, 47 pruebas pasan (incluye las 5 nuevas). |
 | API — prueba HTTP contra el servidor local con un admin temporal (borrado al terminar) | Sin departamento → 422 `acting_department_required`; `finance` → 422 `acting_department_invalid`; `legal` no asignado → 403 `acting_department_not_assigned`; TI asignado → pasa al controlador y el evento `admin.user.role_changed` queda con `acting_department = information_technology`; GET y logout sin departamento → 200. Los tres rechazos quedaron como `auth.acting_department.denied`. |
-| API — `ActingDepartmentTest` (11 pruebas) y suite completa | **Pendiente:** requiere la base `casamonarca_api_test` (ver §7). |
+| API — `php artisan test` (suite completa, incluye las 11 de `ActingDepartmentTest`) | 205 pasan (1979 aserciones). Requiere `OPENSSL_CONF` en Windows (ver §7). |
 | UI con sesión iniciada | **No verificada en navegador:** el admin local tiene TOTP y el inicio de sesión necesita el código del teléfono. La app carga sin errores en la pantalla de login. |
 
 ## 7. Pendientes y riesgos
 
-1. **Correr la suite del API.** Crear la base de pruebas como root y luego `php artisan test`:
-   ```sql
-   CREATE DATABASE casamonarca_api_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   GRANT ALL PRIVILEGES ON casamonarca_api_test.* TO 'casamonarca'@'localhost';
-   ```
+1. **OpenSSL en Windows.** El PHP de winget no encuentra `openssl.cnf`, así que `openssl_pkey_new` falla
+   (2 pruebas de WebAuthn/paquetes de verificación y la rotación de la llave de firma desde el panel). Se
+   resuelve apuntando `OPENSSL_CONF` a `<carpeta de PHP>\extras\ssl\openssl.cnf`. No es parte de este cambio.
 2. **Despliegue.** Con `DEPARTMENT_ATTRIBUTION_ENFORCED=true`, todo usuario existente sin departamento queda
    bloqueado para hacer cambios. Orden sugerido: desplegar con `false` → asignar el primer admin por consola
    → asignar al resto desde el panel → cambiar a `true`.
