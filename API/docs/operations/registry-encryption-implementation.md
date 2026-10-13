@@ -199,16 +199,18 @@ Los registros se borraron al terminar.
 API y Web levantados después del cambio: `/api/csrf-token` responde a través del proxy de Vite y el log del
 API no muestra errores.
 
+### Suite completa del API
+
+`php artisan test` contra `casamonarca_api_test`: **205 pasan** (1969 aserciones), incluidas las 4 de
+`EncryptedPayloadStorageTest` contra MySQL. En el resto de la suite el cifrado está apagado (no se activa en
+`.env.testing`), así que las pruebas existentes de registro y ARCO confirman que el cast nuevo no rompe el
+comportamiento con cifrado desactivado; no las corren con cifrado activo. En Windows requiere `OPENSSL_CONF`
+apuntando a `<carpeta de PHP>\extras\ssl\openssl.cnf` (2 pruebas de WebAuthn generan llaves RSA).
+
 ## 7. Limitaciones y pendientes
 
-1. **Pruebas de feature sin correr.** `EncryptedPayloadStorageTest` y el resto de la suite necesitan
-   `casamonarca_api_test`, que aún no existe. Crear como root:
-   ```sql
-   CREATE DATABASE casamonarca_api_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   GRANT ALL PRIVILEGES ON casamonarca_api_test.* TO 'casamonarca'@'localhost';
-   ```
-   y luego `php artisan test`. Hasta entonces no está comprobado que las pruebas existentes de registro y
-   ARCO pasen con el cast nuevo.
+1. **Suite con cifrado activo.** Las pruebas existentes de registro y ARCO corren con el cifrado apagado.
+   Correrlas con `REGISTRY_ENCRYPTION_ENABLED=true` (y una KEK de prueba) daría más confianza antes de activarlo.
 2. **Flujo ARCO no probado de punta a punta.** El backfill recorrió la tabla (0 filas); la rectificación y
    la cancelación con sobres no se ejercitaron.
 3. **Escritura doble = texto plano sigue en la BD.** En el estado actual un dump todavía expone los datos.
