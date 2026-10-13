@@ -408,6 +408,15 @@ key store unless a requirement justifies their added cost and operation.
 
 ### Phase 2: Registration Payload Migration
 
+> **Status (2026-10-02):** code scaffolding merged behind
+> `REGISTRY_ENCRYPTION_ENABLED` (default off). Implemented: AES-256-GCM envelope
+> cipher with per-payload DEK and AAD binding (`app/Services/Security/Encryption`),
+> file-based KEK provider (interim, see fallback above), additive `*_enc` columns,
+> dual-read `EncryptedPayload` cast, `registry:kek-generate` and resumable
+> `registry:encrypt-backfill` (verifies by decrypt-and-compare). Not yet done: KMS
+> provider, decrypt-and-scan search parity tests, dropping plaintext, Phase 3 files.
+> Feature tests need a MySQL test schema; run `php artisan test`.
+
 - Add versioned ciphertext/envelope columns without removing plaintext columns.
 - Implement dual reads and controlled dual writes, preferring ciphertext when
   present and falling back only during migration.

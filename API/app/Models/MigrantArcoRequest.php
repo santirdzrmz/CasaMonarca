@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Casts\EncryptedPayload;
+use App\Models\Concerns\HasEncryptedPayloads;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class MigrantArcoRequest extends Model
 {
+    use HasEncryptedPayloads;
+
     protected $fillable = [
         'registry_entry_id',
         'requested_by',
@@ -27,11 +31,19 @@ class MigrantArcoRequest extends Model
         'completed_at',
     ];
 
+    protected $hidden = ['original_payload_json_enc', 'proposed_payload_json_enc'];
+
     protected $casts = [
         'escalated_to_admin' => 'boolean',
-        'original_payload_json' => 'array',
-        'proposed_payload_json' => 'array',
+        'original_payload_json' => EncryptedPayload::class.':arco_original_payload',
+        'proposed_payload_json' => EncryptedPayload::class.':arco_proposed_payload',
         'completed_at' => 'datetime',
+    ];
+
+    /** @var array<string, array{0: string, 1: string|null}> */
+    protected array $encryptedPayloads = [
+        'original_payload_json' => ['arco_original_payload', null],
+        'proposed_payload_json' => ['arco_proposed_payload', null],
     ];
 
     public function registryEntry(): BelongsTo

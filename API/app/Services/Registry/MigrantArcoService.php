@@ -217,6 +217,8 @@ class MigrantArcoService
         MigrantArcoRequest::query()->where('registry_entry_id', $entry->id)->update([
             'original_payload_json' => null,
             'proposed_payload_json' => null,
+            'original_payload_json_enc' => null,
+            'proposed_payload_json_enc' => null,
         ]);
         $entry->forceFill([
             'payload_json' => [],
