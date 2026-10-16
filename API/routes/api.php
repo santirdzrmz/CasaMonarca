@@ -73,6 +73,7 @@ use App\Http\Controllers\Api\Registry\MigrantRegistryPdfDownloadVerifyController
 use App\Http\Controllers\Api\Registry\MigrantRegistryReviewOptionsController;
 use App\Http\Controllers\Api\Registry\MigrantRegistryReviewReturnController;
 use App\Http\Controllers\Api\Registry\MigrantRegistryReviewVerifyController;
+use App\Http\Controllers\Api\Registry\MigrantRegistryStatisticsController;
 use App\Http\Controllers\Api\SecurityChallengeCancelController;
 use Illuminate\Support\Facades\Route;
 
@@ -203,6 +204,7 @@ Route::middleware('web')->group(function (): void {
 
         Route::middleware('requireRole:admin,coordinator')->group(function (): void {
             Route::get('/pending-approval', [MigrantRegistryController::class, 'pendingApproval']);
+            Route::get('/statistics', MigrantRegistryStatisticsController::class);
             Route::post('/bulk-approval/options', MigrantRegistryBulkApprovalOptionsController::class);
             Route::post('/bulk-approval/verify', MigrantRegistryBulkApprovalVerifyController::class);
             Route::post('/{migrantRegistryEntry}/approval/options', MigrantRegistryApprovalOptionsController::class);

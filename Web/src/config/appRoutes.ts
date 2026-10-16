@@ -19,6 +19,7 @@ export const APP_MIGRANT_REGISTRY_PATH = '/app/migrants/registry'
 export const APP_MIGRANT_REGISTRATIONS_PATH = '/app/migrants/registrations'
 export const APP_MIGRANT_APPROVALS_PATH = '/app/migrants/approvals'
 export const APP_MIGRANT_ARCO_PATH = '/app/migrants/arco'
+export const APP_MIGRANT_STATISTICS_PATH = '/app/migrants/statistics'
 export const FORBIDDEN_PATH = '/403'
 
 export type AppWorkspace = 'internal' | 'migrant'
@@ -119,6 +120,15 @@ export const APP_ROUTE_CONFIG: AppRouteConfig[] = [
     requiredModule: 'dashboard',
     allowedRoles: ['admin', 'coordinator', 'non_coordinator'],
     enabled: arcoEnabled,
+    workspace: 'migrant',
+  },
+  {
+    path: APP_MIGRANT_STATISTICS_PATH,
+    label: t("Statistics", "Estadísticas"),
+    kicker: t("Registry analysis", "Análisis de registros"),
+    copy: t("Arrivals, demographics, and travel times from approved migrant registrations.", "Llegadas, perfil demográfico y tiempos de trayecto a partir de los registros aprobados."),
+    requiredModule: 'dashboard',
+    allowedRoles: ['admin', 'coordinator'],
     workspace: 'migrant',
   },
 ]

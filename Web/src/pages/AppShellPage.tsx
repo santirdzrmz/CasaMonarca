@@ -12,6 +12,7 @@ import {
   APP_MIGRANT_ARCO_PATH,
   APP_MIGRANT_REGISTRY_PATH,
   APP_MIGRANT_REGISTRATIONS_PATH,
+  APP_MIGRANT_STATISTICS_PATH,
   APP_UPLOAD_PATH,
   getRouteConfigForUser,
   getVisibleRoutesForUser,
@@ -28,6 +29,7 @@ import { MigrantsApprovalsPage } from './registry/MigrantsApprovalsPage'
 import { MigrantsArcoPage } from './registry/MigrantsArcoPage'
 import { MigrantsRegistryPage } from './registry/MigrantsRegistryPage'
 import { MigrantRegistrationsPage } from './registry/MigrantRegistrationsPage'
+import { MigrantStatisticsPage } from './registry/MigrantStatisticsPage'
 
 const ROUTE_ICONS: Record<string, AppIconName> = {
   [APP_HOME_PATH]: 'dashboard',
@@ -40,6 +42,7 @@ const ROUTE_ICONS: Record<string, AppIconName> = {
   [APP_MIGRANT_REGISTRATIONS_PATH]: 'document',
   [APP_MIGRANT_APPROVALS_PATH]: 'verify',
   [APP_MIGRANT_ARCO_PATH]: 'document',
+  [APP_MIGRANT_STATISTICS_PATH]: 'chart',
 }
 
 const WORKSPACE_LABELS: Record<AppWorkspace, string> = {
@@ -116,6 +119,8 @@ function renderModule(
       )
     case APP_MIGRANT_ARCO_PATH:
       return <MigrantsArcoPage onSessionExpired={onSessionExpired} user={user} />
+    case APP_MIGRANT_STATISTICS_PATH:
+      return <MigrantStatisticsPage onSessionExpired={onSessionExpired} user={user} />
     default:
       return (
         <SessionPage
