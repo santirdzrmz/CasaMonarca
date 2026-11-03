@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Casts\EncryptedPayload;
+use App\Models\Concerns\HasEncryptedPayloads;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MigrantRegistryEntry extends Model
 {
+    use HasEncryptedPayloads;
     use SoftDeletes;
 
     protected $fillable = [
@@ -23,9 +26,17 @@ class MigrantRegistryEntry extends Model
         'pending_payload_json',
     ];
 
+    protected $hidden = ['payload_json_enc', 'pending_payload_json_enc'];
+
     protected $casts = [
-        'payload_json' => 'array',
-        'pending_payload_json' => 'array',
+        'payload_json' => EncryptedPayload::class.':registration_payload',
+        'pending_payload_json' => EncryptedPayload::class.':pending_registration_payload',
+    ];
+
+    /** @var array<string, array{0: string, 1: string|null}> */
+    protected array $encryptedPayloads = [
+        'payload_json' => ['registration_payload', '{}'],
+        'pending_payload_json' => ['pending_registration_payload', null],
     ];
 
     public function signatures(): HasMany
