@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Department;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\User;
+use App\Services\Admin\UserDepartmentAssignmentService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -28,7 +30,7 @@ class DatabaseSeeder extends Seeder
             return;
         }
 
-        User::updateOrCreate(
+        $admin = User::updateOrCreate(
             ['email' => trim($email)],
             [
                 'name' => 'Local Admin',
@@ -40,5 +42,17 @@ class DatabaseSeeder extends Seeder
                 'two_factor_secret' => null,
             ],
         );
+
+        // Department attribution is enforced by default, so an admin without a
+        // department could not make any change. Keep departments set on reseed.
+        if ($admin->departmentValues() === []) {
+            app(UserDepartmentAssignmentService::class)->sync(
+                request(),
+                $admin,
+                [Department::InformationTechnology],
+                null,
+                'seeder',
+            );
+        }
     }
 }
