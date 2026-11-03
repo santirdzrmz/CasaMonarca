@@ -6,6 +6,7 @@ import { RoleBadge } from '../components/ui/RoleBadge'
 import { APP_ADMIN_PATH, APP_DOCUMENTS_PATH } from '../config/appRoutes'
 import { ApiRequestError } from '../lib/api'
 import type { UserRole } from '../lib/auth'
+import { DEPARTMENTS, departmentLabel } from '../lib/departments'
 import {
   getAuditEvents,
   type AuditEventCategory,
@@ -74,6 +75,7 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
 type LoggingFeedState = {
   categoryFilter: AuditEventCategory | ''
+  departmentFilter: string
   outcomeFilter: AuditEventSummary['outcome'] | ''
   page: number
   pageSize: number
@@ -84,6 +86,7 @@ const LOGGING_FILTER_SESSION_KEY = 'casa-monarca.logging.filters'
 
 const DEFAULT_LOGGING_FILTERS: LoggingFeedState = {
   categoryFilter: '',
+  departmentFilter: '',
   outcomeFilter: '',
   page: 1,
   pageSize: 25,
@@ -120,6 +123,7 @@ const readStoredLoggingFilters = (): LoggingFeedState => {
 
     return {
       categoryFilter: isAuditCategory(parsedValue.categoryFilter) ? parsedValue.categoryFilter : '',
+      departmentFilter: typeof parsedValue.departmentFilter === 'string' && (DEPARTMENTS as readonly string[]).includes(parsedValue.departmentFilter) ? parsedValue.departmentFilter : '',
       outcomeFilter: isAuditOutcome(parsedValue.outcomeFilter) ? parsedValue.outcomeFilter : '',
       page: Number.isInteger(page) && page > 0 ? page : 1,
       pageSize: PAGE_SIZE_OPTIONS.includes(pageSize) ? pageSize : 25,
@@ -264,6 +268,11 @@ const renderActor = (event: AuditEventSummary, onNavigate?: (to: string) => void
           </a>
         ) : actorLabel}
         {roleBadge ? <span className="audit-actor-role">{roleBadge}</span> : null}
+        {event.actor.department ? (
+          <span className="audit-actor-department" title={t('Acting department', 'Departamento declarado')}>
+            {departmentLabel(event.actor.department)}
+          </span>
+        ) : null}
       </>
     )
   }
@@ -438,6 +447,7 @@ export function LoggingPage({ onNavigate, onSessionExpired }: LoggingPageProps) 
   const [error, setError] = useState<string | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<AuditEventCategory | ''>(initialFilters.categoryFilter)
   const [debouncedSearch, setDebouncedSearch] = useState(initialFilters.search)
+  const [departmentFilter, setDepartmentFilter] = useState(initialFilters.departmentFilter)
   const [isLoading, setIsLoading] = useState(true)
   const [outcomeFilter, setOutcomeFilter] = useState<AuditEventSummary['outcome'] | ''>(initialFilters.outcomeFilter)
   const [page, setPage] = useState(initialFilters.page)
@@ -470,6 +480,7 @@ export function LoggingPage({ onNavigate, onSessionExpired }: LoggingPageProps) 
 
     getAuditEvents({
       category: categoryFilter || undefined,
+      department: departmentFilter || undefined,
       limit: pageSize,
       outcome: outcomeFilter || undefined,
       page,
@@ -506,17 +517,18 @@ export function LoggingPage({ onNavigate, onSessionExpired }: LoggingPageProps) 
     return () => {
       isMounted = false
     }
-  }, [categoryFilter, debouncedSearch, onSessionExpired, outcomeFilter, page, pageSize, reloadToken])
+  }, [categoryFilter, debouncedSearch, departmentFilter, onSessionExpired, outcomeFilter, page, pageSize, reloadToken])
 
   useEffect(() => {
     storeLoggingFilters({
       categoryFilter,
+      departmentFilter,
       outcomeFilter,
       page,
       pageSize,
       search: debouncedSearch,
     })
-  }, [categoryFilter, debouncedSearch, outcomeFilter, page, pageSize])
+  }, [categoryFilter, debouncedSearch, departmentFilter, outcomeFilter, page, pageSize])
 
   const refreshFeed = () => {
     setIsLoading(true)
@@ -528,12 +540,13 @@ export function LoggingPage({ onNavigate, onSessionExpired }: LoggingPageProps) 
     ? 0
     : (pagination.page - 1) * pagination.limit + 1
   const lastVisibleEvent = Math.min(pagination.page * pagination.limit, pagination.total)
-  const hasActiveFilters = categoryFilter !== '' || outcomeFilter !== '' || debouncedSearch !== ''
+  const hasActiveFilters = categoryFilter !== '' || departmentFilter !== '' || outcomeFilter !== '' || debouncedSearch !== ''
 
   const resetFilters = () => {
     setIsLoading(true)
     setError(null)
     setCategoryFilter('')
+    setDepartmentFilter('')
     setOutcomeFilter('')
     setSearchInput('')
     setDebouncedSearch('')
@@ -587,6 +600,26 @@ export function LoggingPage({ onNavigate, onSessionExpired }: LoggingPageProps) 
               <option value="success">{t("Success", "Exitoso")}</option>
               <option value="failure">{t("Failure", "Fallido")}</option>
               <option value="denied">{t("Denied", "Denegado")}</option>
+            </select>
+          </label>
+
+          <label className="audit-control">
+            <span>{t("Department", "Departamento")}</span>
+            <select
+              onChange={(event) => {
+                setIsLoading(true)
+                setError(null)
+                setDepartmentFilter(event.target.value)
+                setPage(1)
+              }}
+              value={departmentFilter}
+            >
+              <option value="">{t("All departments", "Todos los departamentos")}</option>
+              {DEPARTMENTS.map((department) => (
+                <option key={department} value={department}>
+                  {departmentLabel(department)}
+                </option>
+              ))}
             </select>
           </label>
 

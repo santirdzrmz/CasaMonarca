@@ -40,6 +40,7 @@ class AuthenticatedUserViewService
      *             },
      *         },
      *     },
+     *     departments: list<string>,
      *     email: string,
      *     id: int|string,
      *     name: string,
@@ -53,6 +54,7 @@ class AuthenticatedUserViewService
             'name' => $user->name,
             'email' => $user->email,
             'role' => $user->role?->value ?? UserRole::default()->value,
+            'departments' => $user->departmentValues(),
             'capabilities' => $this->sessionCapabilityService->forUser($user),
         ];
     }

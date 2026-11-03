@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Department;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -65,6 +66,29 @@ class User extends Authenticatable
     public function hasTotpEnabled(): bool
     {
         return $this->two_factor_enabled && filled($this->two_factor_secret);
+    }
+
+    public function departmentAssignments(): HasMany
+    {
+        return $this->hasMany(UserDepartment::class);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function departmentValues(): array
+    {
+        return $this->departmentAssignments()
+            ->pluck('department')
+            ->map(fn (Department $department): string => $department->value)
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    public function hasDepartment(Department $department): bool
+    {
+        return $this->departmentAssignments()->where('department', $department->value)->exists();
     }
 
     public function webauthnCredentials(): HasMany

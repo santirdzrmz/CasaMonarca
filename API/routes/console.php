@@ -1,5 +1,8 @@
 <?php
 
+use App\Enums\Department;
+use App\Models\User;
+use App\Services\Admin\UserDepartmentAssignmentService;
 use App\Services\Documents\VerificationPackageSigningKeyService;
 use App\Services\Registry\MigrantRegistryService;
 use App\Services\Security\SecurityChallengeIntentService;
@@ -84,6 +87,52 @@ Artisan::command(
         return Command::SUCCESS;
     },
 )->purpose('Mark pending security challenge intents as expired after their expiry time.');
+
+Artisan::command(
+    'users:departments
+        {email : Account email}
+        {departments?* : Department values to assign; omit to list the current ones}
+        {--replace : Replace the current set instead of adding to it}',
+    function (): int {
+        $user = User::query()->where('email', (string) $this->argument('email'))->first();
+
+        if (! $user instanceof User) {
+            $this->error('No user with that email.');
+
+            return Command::FAILURE;
+        }
+
+        $requested = (array) $this->argument('departments');
+
+        if ($requested === []) {
+            $this->line($user->email.': '.(implode(', ', $user->departmentValues()) ?: '(none)'));
+            $this->line('Valid values: '.implode(', ', Department::values()));
+
+            return Command::SUCCESS;
+        }
+
+        $invalid = array_diff($requested, Department::values());
+
+        if ($invalid !== []) {
+            $this->error('Invalid department(s): '.implode(', ', $invalid).'. Valid values: '.implode(', ', Department::values()));
+
+            return Command::FAILURE;
+        }
+
+        $values = $this->option('replace') ? $requested : [...$user->departmentValues(), ...$requested];
+        $result = app(UserDepartmentAssignmentService::class)->sync(
+            request(),
+            $user,
+            array_map(fn (string $value): Department => Department::from($value), array_unique($values)),
+            null,
+            'console',
+        );
+
+        $this->info($user->email.': '.implode(', ', $result['current']));
+
+        return Command::SUCCESS;
+    },
+)->purpose('List or assign the departments a user can act for (bootstrap for the first admin).');
 
 Artisan::command('registry:migrant-drafts:purge', function (): int {
     $purged = app(MigrantRegistryService::class)->purgeExpiredDrafts(7);

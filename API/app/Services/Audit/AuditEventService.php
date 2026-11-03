@@ -4,6 +4,8 @@ namespace App\Services\Audit;
 
 use App\Enums\AuditEventOutcome;
 use App\Enums\AuditEventType;
+use App\Enums\Department;
+use App\Http\Middleware\RequireActingDepartment;
 use App\Models\AuditEvent;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -116,6 +118,7 @@ class AuditEventService
             'occurred_at' => now('UTC'),
             'actor_user_id' => $resolvedActor?->getKey(),
             'actor_role' => $resolvedActor?->role?->value,
+            'acting_department' => $this->resolveActingDepartment($request),
             'event_type' => $eventType->value,
             'resource_type' => $this->nullableString($resource['type'] ?? null),
             'resource_id' => $this->nullableInteger($resource['id'] ?? null),
@@ -144,6 +147,13 @@ class AuditEventService
         $normalized = trim($value);
 
         return $normalized === '' ? null : $normalized;
+    }
+
+    private function resolveActingDepartment(Request $request): ?string
+    {
+        $department = $request->attributes->get(RequireActingDepartment::ATTRIBUTE);
+
+        return $department instanceof Department ? $department->value : null;
     }
 
     private function resolveRequestId(Request $request): ?string
