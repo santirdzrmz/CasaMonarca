@@ -1,0 +1,428 @@
+/*
+ * Chart tokens. Categorical slots 1-4 validated on the panel surface #fffcf7
+ * (scripts/validate_palette.js, light): all hard gates pass; aqua and yellow sit
+ * below 3:1 contrast, so every chart ships a legend/direct labels and a table view.
+ * The app has no dark theme yet; add a dark step set here when it does.
+ */
+.viz-root {
+  --viz-surface: #fffcf7;
+  --viz-text-primary: #0b0b0b;
+  --viz-text-secondary: #52514e;
+  --viz-text-muted: #6f6d68;
+  --viz-grid: #e8e5dc;
+  --viz-axis: #c3c2b7;
+  --viz-series-1: #2a78d6;
+  --viz-series-2: #eb6834;
+  --viz-series-3: #1baf7a;
+  --viz-series-4: #eda100;
+  --viz-muted-series: #b9b7b0;
+  --viz-meter-track: #cde2fb;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--viz-text-primary);
+}
+
+.viz-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Filters: one row above everything they scope. */
+.viz-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1.25rem;
+}
+
+.viz-filters__group {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.viz-filters__label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--viz-text-secondary);
+}
+
+.viz-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border: 1px solid rgba(19, 35, 58, 0.12);
+  border-radius: 0.7rem;
+  background: #fff;
+}
+
+.viz-presets button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.7rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--viz-text-secondary);
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.viz-presets button:hover {
+  background: rgba(19, 35, 58, 0.05);
+}
+
+.viz-presets button[aria-pressed='true'] {
+  background: rgba(42, 120, 214, 0.1);
+  color: var(--viz-text-primary);
+  font-weight: 700;
+}
+
+.viz-presets__check {
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.viz-filters input[type='date'],
+.viz-filters select {
+  padding: 0.42rem 0.6rem;
+  border: 1px solid rgba(19, 35, 58, 0.18);
+  border-radius: 0.55rem;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.viz-filters__range {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Refetch keeps the frame: previous render at reduced opacity, no skeleton. */
+.viz-body {
+  display: grid;
+  gap: 1rem;
+  transition: opacity 120ms ease;
+}
+
+.viz-body--refreshing {
+  opacity: 0.55;
+}
+
+/* KPI row */
+.viz-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1rem;
+}
+
+.viz-tile {
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+}
+
+.viz-tile__label {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--viz-text-secondary);
+}
+
+.viz-tile__value {
+  margin: 0;
+  font-size: 1.9rem;
+  font-weight: 650;
+  line-height: 1.1;
+}
+
+.viz-tile__value--hero {
+  font-size: 3.2rem;
+}
+
+.viz-tile__note {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--viz-text-muted);
+}
+
+.viz-meter {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--viz-meter-track);
+  overflow: hidden;
+}
+
+.viz-meter__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--viz-series-1);
+}
+
+/* Cards */
+.viz-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+}
+
+.viz-card {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.viz-card__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.viz-card__subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: var(--viz-text-muted);
+}
+
+/* Column chart */
+.viz-chart {
+  position: relative;
+  min-width: 0;
+}
+
+.viz-chart__svg {
+  display: block;
+  overflow: visible;
+}
+
+line.viz-grid,
+line.viz-axis {
+  shape-rendering: crispEdges;
+}
+
+line.viz-grid {
+  stroke: var(--viz-grid);
+  stroke-width: 1;
+}
+
+line.viz-axis {
+  stroke: var(--viz-axis);
+  stroke-width: 1;
+}
+
+.viz-tick {
+  fill: var(--viz-text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-value {
+  fill: var(--viz-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.viz-column {
+  transition: opacity 120ms ease;
+}
+
+.viz-column--dimmed {
+  opacity: 0.45;
+}
+
+.viz-hit {
+  fill: transparent;
+  cursor: default;
+  outline: none;
+}
+
+.viz-hit:focus-visible {
+  stroke: var(--viz-text-secondary);
+  stroke-width: 1;
+}
+
+.viz-tooltip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 0.2rem;
+  min-width: 9rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid rgba(11, 11, 11, 0.1);
+  border-radius: 0.55rem;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(24, 36, 55, 0.12);
+  font-size: 0.8rem;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.viz-tooltip__title {
+  color: var(--viz-text-muted);
+  font-size: 0.74rem;
+}
+
+.viz-tooltip__row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--viz-text-secondary);
+}
+
+.viz-tooltip__row strong {
+  color: var(--viz-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-tooltip__row--total {
+  padding-top: 0.2rem;
+  border-top: 1px solid var(--viz-grid);
+}
+
+.viz-tooltip__key {
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.viz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin: 0 0 0.4rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  color: var(--viz-text-secondary);
+}
+
+.viz-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.viz-legend__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* Bar list */
+.viz-barlist {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.viz-barlist__row {
+  display: grid;
+  grid-template-columns: minmax(6rem, 38%) 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 0.35rem;
+  outline: none;
+}
+
+.viz-barlist__row:hover .viz-barlist__bar,
+.viz-barlist__row:focus-visible .viz-barlist__bar {
+  filter: brightness(1.08);
+}
+
+.viz-barlist__row:focus-visible {
+  box-shadow: 0 0 0 2px rgba(42, 120, 214, 0.35);
+}
+
+.viz-barlist__label {
+  overflow: hidden;
+  font-size: 0.84rem;
+  color: var(--viz-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viz-barlist__track {
+  display: block;
+  height: 14px;
+}
+
+.viz-barlist__bar {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: var(--viz-series-1);
+}
+
+.viz-barlist__row--muted .viz-barlist__bar {
+  background: var(--viz-muted-series);
+}
+
+.viz-barlist__value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 5.5rem;
+  justify-content: flex-end;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-barlist__value span {
+  color: var(--viz-text-muted);
+  font-size: 0.76rem;
+}
+
+/* Table twin */
+.viz-table summary {
+  width: fit-content;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--viz-text-secondary);
+  cursor: pointer;
+}
+
+.viz-table__scroll {
+  max-height: 18rem;
+  margin-top: 0.5rem;
+  overflow: auto;
+}
+
+.viz-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.viz-table th,
+.viz-table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--viz-grid);
+  text-align: left;
+  font-weight: 400;
+}
+
+.viz-table thead th {
+  font-weight: 700;
+  color: var(--viz-text-secondary);
+}
+
+.viz-table__num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-empty {
+  margin: 0;
+  color: var(--viz-text-secondary);
+}

@@ -3,6 +3,7 @@ type AppIconProps = {
   name:
     | 'admin'
     | 'bundle'
+    | 'chart'
     | 'copy'
     | 'dashboard'
     | 'delete'
@@ -54,6 +55,15 @@ export function AppIcon({
           <rect {...commonProps} height="7" rx="1.4" width="7" x="13.5" y="3.5" />
           <rect {...commonProps} height="7" rx="1.4" width="7" x="3.5" y="13.5" />
           <rect {...commonProps} height="7" rx="1.4" width="7" x="13.5" y="13.5" />
+        </>
+      ) : null}
+
+      {name === 'chart' ? (
+        <>
+          <path {...commonProps} d="M4 20h16" />
+          <path {...commonProps} d="M7 16.5v-5" />
+          <path {...commonProps} d="M12 16.5V6.5" />
+          <path {...commonProps} d="M17 16.5v-8" />
         </>
       ) : null}
 
