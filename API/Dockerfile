@@ -1,4 +1,6 @@
-FROM php:8.3-apache
+# Pinned to a patch release: 8.3.36 fixes CVE-2026-109618/109619 (mod_php RCE).
+# Bump deliberately when a new PHP security release ships.
+FROM php:8.3.36-apache
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

@@ -80,13 +80,13 @@ Route::get('/health', HealthController::class);
 
 Route::middleware('web')->group(function (): void {
     Route::get('/csrf-token', CsrfTokenController::class);
-    Route::post('/login', LoginController::class);
-    Route::post('/login/totp', TotpLoginController::class);
+    Route::post('/login', LoginController::class)->middleware('throttle:20,1');
+    Route::post('/login/totp', TotpLoginController::class)->middleware('throttle:20,1');
     Route::post('/password-reset/complete', PasswordResetCompleteController::class)->middleware('throttle:10,1');
-    Route::post('/totp/enroll/options', TotpEnrollmentOptionsController::class)->middleware(['auth', 'requireActiveAccount']);
-    Route::post('/totp/enroll/verify', TotpEnrollmentVerifyController::class)->middleware(['auth', 'requireActiveAccount']);
-    Route::post('/webauthn/login/options', WebauthnLoginOptionsController::class);
-    Route::post('/webauthn/login/verify', WebauthnLoginVerifyController::class);
+    Route::post('/totp/enroll/options', TotpEnrollmentOptionsController::class)->middleware(['auth', 'requireActiveAccount', 'throttle:10,1']);
+    Route::post('/totp/enroll/verify', TotpEnrollmentVerifyController::class)->middleware(['auth', 'requireActiveAccount', 'throttle:10,1']);
+    Route::post('/webauthn/login/options', WebauthnLoginOptionsController::class)->middleware('throttle:30,1');
+    Route::post('/webauthn/login/verify', WebauthnLoginVerifyController::class)->middleware('throttle:30,1');
     Route::get('/invites/preview', AccountInvitePreviewController::class)->middleware('throttle:30,1');
     Route::post('/invites/redeem', AccountInviteRedeemController::class)->middleware('throttle:10,1');
     Route::post('/logout', LogoutController::class);

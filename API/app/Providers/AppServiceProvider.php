@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use RuntimeException;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +20,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Debug pages expose environment values, stack traces and request data.
+        if ($this->app->isProduction() && config('app.debug')) {
+            throw new RuntimeException('APP_DEBUG must be false when APP_ENV=production.');
+        }
     }
 }

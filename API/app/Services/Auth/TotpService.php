@@ -30,21 +30,30 @@ class TotpService
 
     public function verify(string $secret, string $candidateCode, int $window = 1): bool
     {
+        return $this->matchingCounter($secret, $candidateCode, $window) !== null;
+    }
+
+    /**
+     * Returns the time-step counter the code belongs to, so callers can
+     * reject a code that was already used (RFC 6238 §5.2).
+     */
+    public function matchingCounter(string $secret, string $candidateCode, int $window = 1): ?int
+    {
         $normalizedCode = preg_replace('/\s+/', '', $candidateCode) ?? '';
 
         if (! preg_match('/^\d{6}$/', $normalizedCode)) {
-            return false;
+            return null;
         }
 
         $counter = intdiv(time(), self::TIME_STEP_SECONDS);
 
         for ($offset = -$window; $offset <= $window; $offset++) {
             if (hash_equals($this->codeForCounter($secret, $counter + $offset), $normalizedCode)) {
-                return true;
+                return $counter + $offset;
             }
         }
 
-        return false;
+        return null;
     }
 
     private function codeForCounter(string $secret, int $counter): string

@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureAccountActive;
 use App\Http\Middleware\RequireFeatureEnabled;
 use App\Http\Middleware\RequireRole;
 use App\Http\Middleware\RequireSecurityEnrollment;
+use App\Http\Middleware\SetSecurityHeaders;
 use App\Http\Middleware\TrustConfiguredProxies;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Foundation\Application;
@@ -41,6 +42,21 @@ return Application::configure(basePath: dirname(__DIR__))
         }
 
         $middleware->append(TrustConfiguredProxies::class);
+        $middleware->append(SetSecurityHeaders::class);
+
+        // Host-header allowlist (e.g. "api.example.org,staging-api.example.org").
+        // Laravel skips this check in local and test environments.
+        $trustedHosts = array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('TRUSTED_HOSTS', '')),
+        )));
+
+        if ($trustedHosts !== []) {
+            $middleware->trustHosts(
+                at: array_map(fn (string $host): string => '^'.preg_quote($host).'$', $trustedHosts),
+                subdomains: false,
+            );
+        }
 
         $middleware->alias([
             'requireActiveAccount' => EnsureAccountActive::class,
