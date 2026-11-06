@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Llaves del Registro Migrante</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one reading column of key-custody decisions, then a working lab bench of four sequential steps. */
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --ink: #18212d;
+  --muted: #566274;
+  --line: #d5dbe3;
+  --kek: #1e4f89;       /* master key: Casa Monarca navy */
+  --kek-tint: rgba(30, 79, 137, 0.09);
+  --dek: #237d54;       /* per-record data key */
+  --dek-tint: rgba(35, 125, 84, 0.1);
+  --aad: #8f5308;       /* bound context */
+  --aad-tint: rgba(214, 164, 74, 0.16);
+  --fail: #9d352e;
+  --fail-tint: rgba(157, 53, 46, 0.09);
+  --code-bg: #eef1f5;
+  --font-body: "IBM Plex Sans", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e131a; --surface: #151c26; --ink: #e5eaf1; --muted: #9ba8b9; --line: #2a3443;
+    --kek: #86afe4; --kek-tint: rgba(134, 175, 228, 0.12);
+    --dek: #63c79a; --dek-tint: rgba(99, 199, 154, 0.12);
+    --aad: #e2ab52; --aad-tint: rgba(226, 171, 82, 0.13);
+    --fail: #ec8a82; --fail-tint: rgba(236, 138, 130, 0.12);
+    --code-bg: #0b1016;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e131a; --surface: #151c26; --ink: #e5eaf1; --muted: #9ba8b9; --line: #2a3443;
+  --kek: #86afe4; --kek-tint: rgba(134, 175, 228, 0.12);
+  --dek: #63c79a; --dek-tint: rgba(99, 199, 154, 0.12);
+  --aad: #e2ab52; --aad-tint: rgba(226, 171, 82, 0.13);
+  --fail: #ec8a82; --fail-tint: rgba(236, 138, 130, 0.12);
+  --code-bg: #0b1016;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 56px;
+}
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.25; }
+h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); font-weight: 700; letter-spacing: -0.015em; }
+h2 { font-size: 1.45rem; font-weight: 600; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+.eyebrow {
+  font-size: 0.74rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.09em; color: var(--muted);
+}
+.stack { display: grid; gap: 14px; }
+.section-head { display: grid; gap: 8px; }
+.lede { color: var(--muted); font-size: 1.05rem; }
+
+/* Header */
+header { display: grid; gap: 18px; }
+.state-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.8rem; font-weight: 500;
+  padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+}
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.chip--kek { color: var(--kek); border-color: var(--kek); background: var(--kek-tint); }
+.chip--aad { color: var(--aad); border-color: var(--aad); background: var(--aad-tint); }
+.chip--ok { color: var(--dek); border-color: var(--dek); background: var(--dek-tint); }
+.chip--fail { color: var(--fail); border-color: var(--fail); background: var(--fail-tint); }
+
+.verdict {
+  border-left: 3px solid var(--kek);
+  padding: 4px 0 4px 18px;
+  display: grid; gap: 6px;
+}
+.verdict strong { color: var(--kek); }
+
+/* Diagram */
+.figure {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+.figure svg { display: block; width: 100%; min-width: 760px; height: auto; }
+.figure figcaption { padding: 12px 18px 16px; color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--line); }
+svg .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+svg .box--kek { fill: var(--kek-tint); stroke: var(--kek); }
+svg .box--dek { fill: var(--dek-tint); stroke: var(--dek); }
+svg .box--aad { fill: var(--aad-tint); stroke: var(--aad); stroke-dasharray: 5 4; }
+svg .box--env { fill: var(--code-bg); stroke: var(--line); }
+svg .band { fill: var(--bg); stroke: none; }
+svg .t { fill: var(--ink); font-family: var(--font-body); font-size: 14px; font-weight: 600; }
+svg .s { fill: var(--muted); font-family: var(--font-body); font-size: 12px; }
+svg .m { fill: var(--ink); font-family: var(--font-mono); font-size: 12px; }
+svg .lbl { fill: var(--muted); font-family: var(--font-body); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.4; }
+svg .edge--kek { stroke: var(--kek); stroke-width: 1.8; }
+svg .edge--dek { stroke: var(--dek); stroke-width: 1.8; }
+svg .edge--aad { stroke: var(--aad); stroke-dasharray: 4 3; }
+svg .k { fill: var(--kek); }
+svg .d { fill: var(--dek); }
+svg .a { fill: var(--aad); }
+svg .ahead { fill: var(--muted); }
+svg .ahead--kek { fill: var(--kek); }
+svg .ahead--dek { fill: var(--dek); }
+svg .ahead--aad { fill: var(--aad); }
+
+/* Proposals */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 820px; font-size: 0.9rem; }
+th, td { text-align: left; vertical-align: top; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+th { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.p-name { font-weight: 600; display: block; }
+.p-tag { display: inline-block; margin-top: 4px; font-size: 0.74rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
+.p-tag--now { color: var(--dek); background: var(--dek-tint); }
+.p-tag--next { color: var(--kek); background: var(--kek-tint); }
+.p-tag--later { color: var(--muted); background: var(--bg); border: 1px solid var(--line); }
+.p-tag--today { color: var(--aad); background: var(--aad-tint); }
+tr.is-recommended td:first-child { box-shadow: inset 3px 0 0 var(--dek); }
+
+.discarded { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.discarded > div { border: 1px dashed var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; }
+.discarded p { color: var(--muted); font-size: 0.9rem; }
+
+.roadmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.roadmap > div { padding: 16px 18px; display: grid; gap: 6px; align-content: start; border-right: 1px solid var(--line); }
+.roadmap > div:last-child { border-right: 0; }
+.roadmap .when { font-size: 0.74rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.roadmap p { font-size: 0.9rem; color: var(--muted); }
+@media (max-width: 720px) {
+  .roadmap > div { border-right: 0; border-bottom: 1px solid var(--line); }
+  .roadmap > div:last-child { border-bottom: 0; }
+}
+
+/* Lab */
+.notice {
+  font-size: 0.88rem; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; background: var(--surface);
+}
+.steps { display: grid; gap: 18px; counter-reset: step; }
+.step {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 20px 22px; display: grid; gap: 14px; min-width: 0;
+}
+.step-head { display: flex; gap: 12px; align-items: baseline; }
+.step-head::before {
+  counter-increment: step; content: counter(step);
+  font-family: var(--font-mono); font-size: 0.85rem; font-weight: 500;
+  width: 26px; height: 26px; flex: none; border-radius: 50%;
+  display: inline-grid; place-items: center;
+  border: 1px solid var(--line); color: var(--muted);
+}
+.step-head .stack { gap: 2px; }
+.step-head p { color: var(--muted); font-size: 0.92rem; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field label, .field .label { font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+input[type="text"], input[type="number"], select, textarea {
+  font: inherit; font-size: 0.9rem; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 7px 10px; min-width: 0;
+}
+textarea { font-family: var(--font-mono); font-size: 0.82rem; width: 100%; min-height: 128px; resize: vertical; line-height: 1.5; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: 2px solid var(--kek); outline-offset: 2px;
+}
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg label { display: flex; align-items: center; gap: 6px; padding: 7px 12px; font-size: 0.86rem; cursor: pointer; background: var(--bg); color: var(--muted); }
+.seg label + label { border-left: 1px solid var(--line); }
+.seg input { accent-color: var(--kek); margin: 0; }
+.seg label:has(input:checked) { background: var(--kek-tint); color: var(--kek); font-weight: 600; }
+button {
+  font: inherit; font-size: 0.88rem; font-weight: 600;
+  padding: 8px 14px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--kek); background: var(--kek); color: var(--surface);
+}
+button.secondary { background: var(--surface); color: var(--kek); }
+button.danger { background: var(--surface); color: var(--fail); border-color: var(--fail); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.grid-2 > * { min-width: 0; }
+.out { display: grid; gap: 6px; min-width: 0; }
+.out .label { font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+pre.code {
+  margin: 0; background: var(--code-bg); border-radius: 6px; padding: 10px 12px;
+  white-space: pre-wrap; word-break: break-all; line-height: 1.5; font-size: 0.8rem;
+}
+pre.code.kek { box-shadow: inset 3px 0 0 var(--kek); }
+pre.code.aad { box-shadow: inset 3px 0 0 var(--aad); }
+.shares { display: grid; gap: 6px; }
+.share { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; align-items: start; font-size: 0.86rem; }
+.share .who { font-weight: 600; }
+.share code { word-break: break-all; display: block; padding: 4px 8px; font-size: 0.76rem; }
+@media (max-width: 520px) { .share { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
+.result { font-size: 0.9rem; min-height: 1.6em; }
+.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.log li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; font-size: 0.88rem; }
+.log li .detail { color: var(--muted); }
+.log li .detail code { word-break: break-all; }
+.diff { width: 100%; border-collapse: collapse; font-size: 0.84rem; min-width: 0; }
+.diff th, .diff td { padding: 7px 10px; border-bottom: 1px solid var(--line); background: none; }
+.diff td.v { font-family: var(--font-mono); font-size: 0.78rem; word-break: break-all; }
+.diff-wrap { overflow-x: auto; }
+.small { font-size: 0.85rem; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) {
+  .flash { animation: flash 0.9s ease-out; }
+  @keyframes flash { from { background: var(--kek-tint); } to { background: transparent; } }
+}
+</style>
+
+<div class="page">
+
+<header>
+  <div class="eyebrow">Casa Monarca · Registro migrante · Cifrado en reposo</div>
+  <h1>Llaves del Registro Migrante</h1>
+  <p class="lede">Propuestas para generar y custodiar la llave maestra (KEK) que protege los datos de registro y ARCO, un diagrama del flujo completo y una prueba de concepto que corre en tu navegador con el mismo formato de sobre que <code>EnvelopeCipher</code>.</p>
+  <div class="state-row">
+    <span class="chip chip--aad">Cifrado del registro: apagado por defecto</span>
+    <span class="chip chip--kek">Generador actual: <code>registry:kek-generate</code></span>
+    <span class="chip">AES-256-GCM · sobre por registro</span>
+  </div>
+  <div class="verdict">
+    <p><strong>Recomendación:</strong> usar ya la propuesta B (llave en archivo con respaldo dividido 2 de 3) y migrar a AWS KMS (propuesta C) cuando exista la cuenta de AWS. La interfaz <code>KekProvider</code> ya permite cambiar de una a otra sin tocar los datos cifrados.</p>
+  </div>
+</header>
+
+<section class="stack" aria-labelledby="diagrama">
+  <div class="section-head">
+    <div class="eyebrow">Diagrama</div>
+    <h2 id="diagrama">Cómo se genera la llave y cómo cifra cada registro</h2>
+  </div>
+  <figure class="figure" style="margin:0">
+    <svg viewBox="0 0 960 520" role="img" aria-labelledby="dg-title dg-desc">
+      <title id="dg-title">Flujo de llaves del registro</title>
+      <desc id="dg-desc">Una fuente aleatoria genera la KEK de 256 bits, que se guarda en un archivo o en AWS KMS y se respalda en tres partes. Por cada registro se crea una DEK aleatoria que cifra el payload; la KEK envuelve la DEK. Ambas capas usan el contexto del registro como datos autenticados, y el resultado se guarda en la columna _enc.</desc>
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahead" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="ah-k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahead--kek" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="ah-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahead--dek" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahead--aad" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+
+      <!-- Band 1: key lifecycle -->
+      <rect class="band" x="0" y="0" width="960" height="232"/>
+      <text class="lbl" x="20" y="26">Generación y custodia de la KEK (una vez, y en cada rotación)</text>
+
+      <rect class="box" x="20" y="64" width="180" height="56" rx="8"/>
+      <text class="t" x="34" y="88">Fuente aleatoria</text>
+      <text class="s" x="34" y="107">CSPRNG del SO o KMS</text>
+
+      <path class="edge edge--kek" d="M200,92 L246,92" marker-end="url(#ah-k)"/>
+
+      <rect class="box box--kek" x="250" y="64" width="180" height="56" rx="8"/>
+      <text class="t" x="264" y="88">KEK · 256 bits</text>
+      <text class="m" x="264" y="107">registry-2026-11</text>
+
+      <path class="edge edge--kek" d="M430,92 L460,92 L460,64 L486,64" marker-end="url(#ah-k)"/>
+      <path class="edge edge--kek" d="M460,92 L460,124 L486,124" marker-end="url(#ah-k)"/>
+
+      <rect class="box" x="490" y="40" width="220" height="48" rx="8"/>
+      <text class="t" x="504" y="60">Archivo .key · modo 600</text>
+      <text class="s" x="504" y="78">Propuestas A y B</text>
+
+      <rect class="box" x="490" y="100" width="220" height="48" rx="8"/>
+      <text class="t" x="504" y="120">AWS KMS · no exportable</text>
+      <text class="s" x="504" y="138">Propuestas C y D · auditado</text>
+
+      <path class="edge" d="M710,64 L746,64" marker-end="url(#ah)"/>
+
+      <rect class="box box--dek" x="750" y="40" width="190" height="124" rx="8"/>
+      <text class="t" x="764" y="62">Respaldo 2 de 3</text>
+      <text class="s" x="764" y="80">Shamir · solo propuesta B</text>
+      <text class="m" x="764" y="104">parte 1 · Dirección</text>
+      <text class="m" x="764" y="122">parte 2 · TI</text>
+      <text class="m" x="764" y="140">parte 3 · Legal</text>
+      <text class="s" x="764" y="156">sin conexión</text>
+
+      <path class="edge edge--kek" d="M600,148 L600,250 L340,250 L340,286" marker-end="url(#ah-k)"/>
+      <text class="s" x="610" y="196">KEK activa</text>
+      <text class="s" x="610" y="212">(las anteriores solo descifran)</text>
+
+      <!-- Band 2: per-record envelope -->
+      <text class="lbl" x="20" y="272">Cifrado de cada registro (en cada guardado)</text>
+
+      <rect class="box box--dek" x="20" y="290" width="170" height="56" rx="8"/>
+      <text class="t" x="34" y="314">DEK aleatoria</text>
+      <text class="s" x="34" y="333">32 bytes, nueva cada vez</text>
+
+      <rect class="box" x="20" y="424" width="170" height="56" rx="8"/>
+      <text class="t" x="34" y="448">Payload JSON</text>
+      <text class="m" x="34" y="467">payload_json</text>
+
+      <path class="edge edge--dek" d="M190,318 L236,318" marker-end="url(#ah-d)"/>
+      <path class="edge edge--dek" d="M214,318 L214,438 L236,438" marker-end="url(#ah-d)"/>
+      <path class="edge" d="M190,464 L236,464" marker-end="url(#ah)"/>
+
+      <rect class="box box--kek" x="240" y="290" width="200" height="56" rx="8"/>
+      <text class="t" x="254" y="314">Envolver DEK</text>
+      <text class="s" x="254" y="333">AES-256-GCM con la KEK</text>
+
+      <rect class="box box--aad" x="240" y="366" width="200" height="38" rx="8"/>
+      <text class="t" x="254" y="390" style="font-size:13px">AAD: contexto del registro</text>
+      <path class="edge edge--aad" d="M340,366 L340,350" marker-end="url(#ah-a)"/>
+      <path class="edge edge--aad" d="M340,404 L340,420" marker-end="url(#ah-a)"/>
+
+      <rect class="box box--dek" x="240" y="424" width="200" height="56" rx="8"/>
+      <text class="t" x="254" y="448">Cifrar payload</text>
+      <text class="s" x="254" y="467">AES-256-GCM con la DEK</text>
+
+      <path class="edge edge--kek" d="M440,318 L696,318" marker-end="url(#ah-k)"/>
+      <text class="m" x="456" y="310">wk = nonce ‖ DEK cifrada ‖ tag</text>
+      <path class="edge edge--dek" d="M440,452 L696,452" marker-end="url(#ah-d)"/>
+      <text class="m" x="456" y="444">ct = nonce ‖ payload ‖ tag</text>
+
+      <text class="m a" x="456" y="380">casamonarca|production|</text>
+      <text class="m a" x="456" y="396">migrant_registry_entries|42|</text>
+      <text class="m a" x="456" y="412">registration_payload|v1</text>
+
+      <rect class="box box--env" x="700" y="290" width="240" height="190" rx="8"/>
+      <text class="m" x="714" y="312" style="font-weight:500">payload_json_enc</text>
+      <text class="m" x="714" y="340">{ "v": 1,</text>
+      <text class="m" x="714" y="358">  "alg": "A256GCM",</text>
+      <text class="m k" x="714" y="376">  "kek": "registry-2026-11",</text>
+      <text class="m k" x="714" y="394">  "wk": "…",</text>
+      <text class="m d" x="714" y="412">  "ct": "…" }</text>
+      <text class="s" x="714" y="444">MySQL guarda solo esto;</text>
+      <text class="s" x="714" y="462">la DEK se borra de memoria.</text>
+
+      <text class="s" x="20" y="508">Mover wk o ct a otro registro, columna o entorno cambia el AAD y el descifrado falla.</text>
+    </svg>
+    <figcaption>Azul: llave maestra (KEK). Verde: llave de datos por registro (DEK). Ocre: contexto autenticado (AAD) que amarra ambas capas al registro. Rotar la KEK solo vuelve a envolver <code>wk</code>; <code>ct</code> no cambia.</figcaption>
+  </figure>
+</section>
+
+<section class="stack" aria-labelledby="propuestas">
+  <div class="section-head">
+    <div class="eyebrow">Propuestas</div>
+    <h2 id="propuestas">Cuatro formas de generar y guardar la KEK</h2>
+    <p class="lede">Todas usan el mismo cifrado de sobre. Cambia dónde vive la llave maestra, quién puede usarla y qué pasa si se pierde.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th style="width:20%">Propuesta</th><th style="width:22%">Cómo se genera y dónde vive</th><th style="width:20%">Protege contra</th><th style="width:20%">No protege contra</th><th>Costo</th><th>Esfuerzo</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="p-name">A · Archivo local</span><span class="p-tag p-tag--today">Ya existe</span></td>
+          <td><code>registry:kek-generate</code> toma 32 bytes del CSPRNG del sistema y escribe <code>&lt;id&gt;.key</code> con modo 600 fuera del repo y del web root.</td>
+          <td>Fuga de solo la base de datos o de un respaldo SQL.</td>
+          <td>Quien entre al servidor de HostGator: la llave está junto a la BD. Si el servidor se pierde, la llave también.</td>
+          <td class="num">USD 0</td>
+          <td>Listo</td>
+        </tr>
+        <tr class="is-recommended">
+          <td><span class="p-name">B · Archivo + respaldo 2 de 3</span><span class="p-tag p-tag--now">Recomendada ahora</span></td>
+          <td>Igual que A, y al generarla se divide con Shamir en 3 partes impresas o en USB para Dirección, TI y Legal. Dos cualesquiera la reconstruyen.</td>
+          <td>Todo lo de A, más pérdida de la llave y abuso de un solo custodio: una parte sola no revela nada.</td>
+          <td>Quien entre al servidor (igual que A).</td>
+          <td class="num">USD 0</td>
+          <td>Bajo: 2 comandos (<code>kek-split</code>, <code>kek-restore</code>) y un procedimiento de custodia</td>
+        </tr>
+        <tr>
+          <td><span class="p-name">C · AWS KMS</span><span class="p-tag p-tag--next">Siguiente paso</span></td>
+          <td>KMS genera y guarda la KEK; nunca sale de AWS. Laravel pide <code>GenerateDataKey</code> y <code>Decrypt</code> con un usuario IAM limitado por contexto.</td>
+          <td>Robo de la BD y de los archivos del servidor: no hay llave que robar. El acceso se revoca al momento y queda en CloudTrail.</td>
+          <td>Un Laravel comprometido puede pedir descifrados mientras tenga permisos.</td>
+          <td class="num">≈ USD 2/mes</td>
+          <td>Medio: cuenta AWS, IAM, <code>aws-sdk-php</code>, un <code>KmsKekProvider</code> y caché de DEKs</td>
+        </tr>
+        <tr>
+          <td><span class="p-name">D · KMS + broker de descifrado</span><span class="p-tag p-tag--later">Meta final</span></td>
+          <td>Como C, pero solo un servicio separado puede llamar a KMS. Valida rol, estado del flujo y passkey reciente antes de descifrar.</td>
+          <td>Incluso un Laravel comprometido: no puede pedir descifrados masivos ni salirse del flujo.</td>
+          <td>Compromiso del broker mismo.</td>
+          <td class="num">KMS + cómputo</td>
+          <td>Alto: requiere diseño y modelo de amenazas propio</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="discarded">
+    <div>
+      <h3>Descartada: llave derivada de una contraseña</h3>
+      <p>Argon2id sobre una frase que alguien escribe al desplegar. En hosting compartido no hay un proceso que conserve la llave entre peticiones, y una frase tiene menos entropía que 32 bytes aleatorios.</p>
+    </div>
+    <div>
+      <h3>Descartada: YubiKey como KEK</h3>
+      <p>Las credenciales WebAuthn no sirven para cifrar, y PIV pide PIN o toque en cada uso. Eso bloquea búsquedas, generación de ARCO y trabajos en segundo plano. Las YubiKeys siguen como factor de autorización.</p>
+    </div>
+  </div>
+
+  <div class="roadmap">
+    <div>
+      <span class="when">Ahora</span>
+      <h3>Propuesta B</h3>
+      <p>Generar <code>registry-2026-11</code>, repartir las 3 partes, probar una reconstrucción y activar el cifrado con doble escritura.</p>
+    </div>
+    <div>
+      <span class="when">Con cuenta AWS</span>
+      <h3>Propuesta C</h3>
+      <p>Agregar <code>KmsKekProvider</code>, activar una KEK de KMS para escrituras y re-envolver las DEKs viejas. El <code>ct</code> no se toca.</p>
+    </div>
+    <div>
+      <span class="when">Después</span>
+      <h3>Propuesta D</h3>
+      <p>Quitar a Laravel el permiso de KMS y pasarlo al broker, con límites por usuario y bloqueo de emergencia.</p>
+    </div>
+  </div>
+</section>
+
+<section class="stack" aria-labelledby="poc">
+  <div class="section-head">
+    <div class="eyebrow">Prueba de concepto</div>
+    <h2 id="poc">Genera una llave y cifra un registro aquí mismo</h2>
+    <p class="lede">Usa WebCrypto con AES-256-GCM, el mismo AAD y el mismo sobre <code>{v, alg, kek, wk, ct}</code> que guarda el backend. Ya corrió una vez con datos de ejemplo; puedes cambiar cualquier campo y repetir.</p>
+  </div>
+  <p class="notice">Las llaves se crean en este navegador y no salen de la página. Son de demostración: no las uses en producción. El payload es ficticio. El formato sigue al de <code>EnvelopeCipher</code> pero no se ha probado contra el backend en PHP.</p>
+
+  <div class="steps">
+
+    <div class="step" id="step-kek">
+      <div class="step-head"><div class="stack"><h3>Generar la KEK</h3><p>Modo archivo imita las propuestas A y B. Modo KMS crea una llave no exportable: sirve para cifrar, pero nadie puede leerla.</p></div></div>
+      <div class="controls">
+        <div class="field"><label for="kek-id">Id de la KEK</label><input type="text" id="kek-id" value="registry-2026-11" spellcheck="false"></div>
+        <div class="field"><span class="label">Modo</span>
+          <div class="seg" role="radiogroup" aria-label="Modo de la KEK">
+            <label><input type="radio" name="kek-mode" id="mode-file" value="file" checked> Archivo (A/B)</label>
+            <label><input type="radio" name="kek-mode" id="mode-kms" value="kms"> KMS (C/D)</label>
+          </div>
+        </div>
+        <button id="btn-gen">Generar KEK</button>
+      </div>
+      <div class="grid-2">
+        <div class="out">
+          <span class="label" id="kek-file-label">Contenido del archivo</span>
+          <pre class="code kek" id="kek-file">…</pre>
+          <span class="small" id="kek-note"></span>
+        </div>
+        <div class="out">
+          <span class="label">Respaldo 2 de 3 (Shamir sobre GF(256))</span>
+          <div class="shares" id="shares"></div>
+          <div class="controls">
+            <button class="secondary" id="btn-restore-13">Reconstruir con partes 1 y 3</button>
+            <button class="secondary" id="btn-restore-2">Probar con solo la parte 2</button>
+          </div>
+          <div class="result" id="restore-result" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step" id="step-enc">
+      <div class="step-head"><div class="stack"><h3>Cifrar un registro</h3><p>Se crea una DEK nueva, se cifra el payload con ella y la KEK activa envuelve la DEK. Ambas capas usan el AAD.</p></div></div>
+      <div class="controls">
+        <div class="field"><label for="ctx-env">Entorno</label>
+          <select id="ctx-env"><option>production</option><option>staging</option><option>local</option></select></div>
+        <div class="field"><label for="ctx-table">Tabla</label>
+          <select id="ctx-table"><option>migrant_registry_entries</option><option>migrant_arco_requests</option></select></div>
+        <div class="field"><label for="ctx-id">Id del registro</label><input type="number" id="ctx-id" value="42" min="1" style="width:100px"></div>
+        <div class="field"><label for="ctx-purpose">Propósito</label>
+          <select id="ctx-purpose">
+            <option>registration_payload</option><option>pending_registration_payload</option>
+            <option>arco_original_payload</option><option>arco_proposed_payload</option>
+          </select></div>
+      </div>
+      <div class="field"><label for="payload">Payload (ejemplo ficticio)</label>
+<textarea id="payload" spellcheck="false">{
+  "nombre": "Persona de Ejemplo",
+  "pais_origen": "Honduras",
+  "fecha_llegada": "2026-10-28",
+  "necesidades": ["albergue", "asesoría legal"],
+  "contacto_emergencia": "+52 81 0000 0000"
+}</textarea></div>
+      <div class="controls"><button id="btn-enc">Cifrar registro</button><span class="result" id="enc-result" aria-live="polite"></span></div>
+      <div class="grid-2">
+        <div class="out"><span class="label">AAD (contexto autenticado)</span><pre class="code aad" id="aad-out">…</pre></div>
+        <div class="out"><span class="label">Sobre guardado en <code id="enc-col">payload_json_enc</code></span><pre class="code" id="env-out">…</pre></div>
+      </div>
+    </div>
+
+    <div class="step" id="step-dec">
+      <div class="step-head"><div class="stack"><h3>Descifrar y tratar de engañarlo</h3><p>Solo el contexto correcto con la KEK correcta abre el sobre. Cada intento queda en la bitácora.</p></div></div>
+      <div class="controls">
+        <button id="btn-dec-ok">Descifrar con el contexto correcto</button>
+        <button class="danger" id="btn-dec-id">Moverlo al registro 43</button>
+        <button class="danger" id="btn-dec-purpose">Cambiar el propósito</button>
+        <button class="danger" id="btn-dec-env">Abrirlo en staging</button>
+        <button class="danger" id="btn-dec-flip">Alterar 1 byte de ct</button>
+        <button class="danger" id="btn-dec-nokek">Sin la KEK en el servidor</button>
+      </div>
+      <ul class="log" id="dec-log" aria-live="polite"></ul>
+    </div>
+
+    <div class="step" id="step-rot">
+      <div class="step-head"><div class="stack"><h3>Rotar la KEK</h3><p>Se crea una KEK nueva para escrituras y se vuelve a envolver la DEK. El payload cifrado queda idéntico, así que rotar es rápido aunque haya miles de registros.</p></div></div>
+      <div class="controls">
+        <div class="field"><label for="rot-id">Id de la nueva KEK</label><input type="text" id="rot-id" value="registry-2026-12" spellcheck="false"></div>
+        <button id="btn-rot">Rotar y re-envolver</button>
+        <span class="result" id="rot-result" aria-live="polite"></span>
+      </div>
+      <div class="diff-wrap">
+        <table class="diff" id="rot-diff">
+          <thead><tr><th>Campo</th><th>Antes</th><th>Después</th><th>Estado</th></tr></thead>
+          <tbody><tr><td colspan="4" class="small">Pulsa «Rotar y re-envolver» para comparar.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="stack" aria-labelledby="siguientes">
+  <div class="section-head">
+    <div class="eyebrow">Para implementar B en el backend</div>
+    <h2 id="siguientes">Qué cambiaría en el código</h2>
+  </div>
+  <div class="grid-2">
+    <div class="stack">
+      <p><code>registry:kek-split {id}</code> lee la KEK, imprime 3 partes con su número y un hash corto para verificarlas, y no guarda nada.</p>
+      <p><code>registry:kek-restore {id}</code> pide 2 partes, reconstruye la llave, compara el hash y escribe el archivo con modo 600 sin sobrescribir.</p>
+    </div>
+    <div class="stack">
+      <p>Para C basta una clase nueva que implemente <code>KekProvider</code> (<code>activeKekId</code>, <code>wrap</code>, <code>unwrap</code>) y cambiar el binding en <code>AppServiceProvider</code>. Los sobres ya guardan el id de la KEK, así que pueden convivir llaves de archivo y de KMS.</p>
+      <p>En ambos casos: probar la reconstrucción en un simulacro antes de activar <code>--purge-plaintext</code>.</p>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<script>
+(() => {
+  const te = new TextEncoder(), td = new TextDecoder();
+  const $ = (id) => document.getElementById(id);
+  const b64 = (u8) => { let s = ''; for (const b of u8) s += String.fromCharCode(b); return btoa(s); };
+  const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const hex = (u8) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('');
+  const unhex = (s) => new Uint8Array((s.match(/../g) || []).map((h) => parseInt(h, 16)));
+  const short = (s, n = 28) => (s.length > n ? s.slice(0, n) + '…' : s);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // AES-256-GCM, output nonce(12) || ciphertext || tag(16), like Aes256Gcm::seal.
+  async function seal(key, plaintext, aad) {
+    const nonce = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce, additionalData: te.encode(aad), tagLength: 128 }, key, plaintext));
+    const out = new Uint8Array(12 + ct.length);
+    out.set(nonce); out.set(ct, 12);
+    return out;
+  }
+  async function open(key, sealed, aad) {
+    if (sealed.length < 28) throw new Error('El texto cifrado está truncado.');
+    try {
+      return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: sealed.slice(0, 12), additionalData: te.encode(aad), tagLength: 128 }, key, sealed.slice(12)));
+    } catch {
+      throw new Error('Falló la autenticación.');
+    }
+  }
+  const importAes = (raw) => crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+
+  // Shamir secret sharing over GF(2^8), AES polynomial 0x11b.
+  const EXP = new Uint8Array(510), LOG = new Uint8Array(256);
+  (() => { let x = 1; for (let i = 0; i < 255; i++) { EXP[i] = x; LOG[x] = i; let t = x << 1; if (t & 0x100) t ^= 0x11b; x = t ^ x; } for (let i = 255; i < 510; i++) EXP[i] = EXP[i - 255]; })();
+  const mul = (a, b) => (a && b ? EXP[LOG[a] + LOG[b]] : 0);
+  const div = (a, b) => (a ? EXP[(LOG[a] + 255 - LOG[b]) % 255] : 0);
+  function split(secret, n, t) {
+    const shares = Array.from({ length: n }, (_, i) => ({ x: i + 1, y: new Uint8Array(secret.length) }));
+    for (let p = 0; p < secret.length; p++) {
+      const coeffs = [secret[p], ...crypto.getRandomValues(new Uint8Array(t - 1))];
+      for (const s of shares) {
+        let y = 0, xp = 1;
+        for (const c of coeffs) { y ^= mul(c, xp); xp = mul(xp, s.x); }
+        s.y[p] = y;
+      }
+    }
+    return shares;
+  }
+  function combine(shares) {
+    const out = new Uint8Array(shares[0].y.length);
+    for (let p = 0; p < out.length; p++) {
+      let acc = 0;
+      for (const si of shares) {
+        let l = 1;
+        for (const sj of shares) if (sj !== si) l = mul(l, div(sj.x, sj.x ^ si.x));
+        acc ^= mul(si.y[p], l);
+      }
+      out[p] = acc;
+    }
+    return out;
+  }
+
+  // Simulated server key directory: id -> { key, raw|null, mode }.
+  const keyring = new Map();
+  let activeId = null;
+  let shares = [];
+  let current = null; // { envelope, ctx }
+
+  const ctxFromForm = () => ({ env: $('ctx-env').value, table: $('ctx-table').value, id: String(parseInt($('ctx-id').value, 10) || 1), purpose: $('ctx-purpose').value });
+  const aadOf = (c) => ['casamonarca', c.env, c.table, c.id, c.purpose, 'v1'].join('|');
+  const columnOf = (purpose) => ({ registration_payload: 'payload_json', pending_registration_payload: 'pending_payload_json', arco_original_payload: 'original_payload_json', arco_proposed_payload: 'proposed_payload_json' }[purpose] + '_enc');
+
+  async function encryptEnvelope(payload, ctx) {
+    const aad = aadOf(ctx);
+    const dek = crypto.getRandomValues(new Uint8Array(32));
+    try {
+      const wk = await seal(keyring.get(activeId).key, dek, aad);
+      const ct = await seal(await importAes(dek), te.encode(JSON.stringify(payload)), aad);
+      return JSON.stringify({ v: 1, alg: 'A256GCM', kek: activeId, wk: b64(wk), ct: b64(ct) });
+    } finally {
+      dek.fill(0);
+    }
+  }
+  async function unwrapDek(parts, ctx) {
+    const entry = keyring.get(parts.kek);
+    if (!entry) throw new Error(`La KEK [${parts.kek}] no está disponible.`);
+    return open(entry.key, unb64(parts.wk), aadOf(ctx));
+  }
+  async function decryptEnvelope(envelope, ctx) {
+    const parts = JSON.parse(envelope);
+    if (parts.v !== 1 || parts.alg !== 'A256GCM' || typeof parts.kek !== 'string' || typeof parts.wk !== 'string' || typeof parts.ct !== 'string') {
+      throw new Error('Formato de sobre no soportado.');
+    }
+    const dek = await unwrapDek(parts, ctx);
+    try {
+      return JSON.parse(td.decode(await open(await importAes(dek), unb64(parts.ct), aadOf(ctx))));
+    } finally {
+      dek.fill(0);
+    }
+  }
+
+  async function generateKek(id, mode) {
+    if (!/^[A-Za-z0-9._-]{1,64}$/.test(id)) throw new Error('Id inválido: usa letras, números, punto, guion o guion bajo.');
+    if (keyring.has(id)) throw new Error(`Ya existe una KEK con id ${id}; no se sobrescribe.`);
+    let raw = null, key;
+    if (mode === 'file') {
+      raw = crypto.getRandomValues(new Uint8Array(32));
+      key = await importAes(raw);
+    } else {
+      key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    }
+    keyring.set(id, { key, raw, mode });
+    return { key, raw };
+  }
+
+  function renderKek(id, mode, raw) {
+    const file = $('kek-file');
+    $('restore-result').textContent = '';
+    if (mode === 'file') {
+      $('kek-file-label').textContent = `Contenido de ${id}.key (modo 600)`;
+      file.textContent = b64(raw) + '\n';
+      $('kek-note').textContent = '32 bytes en base64, igual que FileKekProvider::generateKeyMaterial().';
+      shares = split(raw, 3, 2);
+      const who = ['Dirección', 'TI', 'Legal'];
+      $('shares').innerHTML = shares.map((s, i) => `<div class="share"><span class="who">Parte ${s.x} · ${who[i]}</span><code>${s.x}-${hex(s.y)}</code></div>`).join('');
+      $('btn-restore-13').disabled = false; $('btn-restore-2').disabled = false;
+    } else {
+      $('kek-file-label').textContent = `KEK ${id} en modo KMS`;
+      file.textContent = 'No hay archivo. La llave existe pero no se puede exportar.';
+      $('kek-note').textContent = '';
+      crypto.subtle.exportKey('raw', keyring.get(id).key)
+        .then(() => { $('kek-note').textContent = 'Inesperado: el navegador permitió exportarla.'; })
+        .catch(() => { $('kek-note').textContent = 'Comprobado: exportKey() la rechaza, igual que KMS nunca entrega la KEK.'; });
+      shares = [];
+      $('shares').innerHTML = '<p class="small">En KMS el respaldo lo administra AWS. No hay partes que repartir.</p>';
+      $('btn-restore-13').disabled = true; $('btn-restore-2').disabled = true;
+    }
+    file.classList.remove('flash'); void file.offsetWidth; file.classList.add('flash');
+  }
+
+  const chip = (ok, text) => `<span class="chip ${ok ? 'chip--ok' : 'chip--fail'}">${esc(text)}</span>`;
+  function log(ok, title, detail) {
+    const li = document.createElement('li');
+    li.innerHTML = `${chip(ok, ok ? 'Abre' : 'Rechazado')}<div><strong>${esc(title)}</strong><div class="detail">${detail}</div></div>`;
+    $('dec-log').prepend(li);
+    while ($('dec-log').children.length > 8) $('dec-log').lastChild.remove();
+  }
+  async function attempt(title, envelope, ctx) {
+    try {
+      const payload = await decryptEnvelope(envelope, ctx);
+      log(true, title, `Payload recuperado: <code>${esc(short(JSON.stringify(payload), 90))}</code>`);
+    } catch (e) {
+      log(false, title, `${esc(e.message)} AAD usado: <code>${esc(aadOf(ctx))}</code>`);
+    }
+  }
+
+  async function doGenerate() {
+    const id = $('kek-id').value.trim();
+    const mode = document.querySelector('input[name="kek-mode"]:checked').value;
+    try {
+      const { raw } = await generateKek(id, mode);
+      activeId = id;
+      renderKek(id, mode, raw);
+      $('btn-enc').disabled = false;
+      await doEncrypt();
+    } catch (e) {
+      $('kek-file').textContent = e.message;
+    }
+  }
+
+  async function doEncrypt() {
+    let payload;
+    try { payload = JSON.parse($('payload').value); }
+    catch { $('enc-result').innerHTML = chip(false, 'El payload no es JSON válido'); return; }
+    const ctx = ctxFromForm();
+    const envelope = await encryptEnvelope(payload, ctx);
+    current = { envelope, ctx };
+    $('aad-out').textContent = aadOf(ctx);
+    $('enc-col').textContent = columnOf(ctx.purpose);
+    $('env-out').textContent = JSON.stringify(JSON.parse(envelope), null, 2);
+    const plainBytes = te.encode(JSON.stringify(payload)).length;
+    $('enc-result').innerHTML = `<span class="small">${plainBytes} bytes de payload → ${envelope.length} bytes de sobre, KEK <code>${esc(activeId)}</code></span>`;
+    for (const id of ['btn-dec-ok', 'btn-dec-id', 'btn-dec-purpose', 'btn-dec-env', 'btn-dec-flip', 'btn-dec-nokek', 'btn-rot']) $(id).disabled = false;
+  }
+
+  $('btn-gen').addEventListener('click', doGenerate);
+  $('btn-enc').addEventListener('click', doEncrypt);
+
+  $('btn-restore-13').addEventListener('click', () => {
+    const got = combine([shares[0], shares[2]]);
+    const ok = hex(got) === hex(keyring.get(activeId).raw);
+    $('restore-result').innerHTML = `${chip(ok, ok ? 'Coincide' : 'No coincide')} <span class="small">Reconstruida: <code>${short(b64(got), 24)}</code></span>`;
+  });
+  $('btn-restore-2').addEventListener('click', () => {
+    const got = combine([shares[1]]);
+    const ok = hex(got) === hex(keyring.get(activeId).raw);
+    $('restore-result').innerHTML = `${chip(ok, ok ? 'Coincide' : 'No coincide')} <span class="small">Con una sola parte el resultado es ruido: <code>${short(b64(got), 24)}</code></span>`;
+  });
+
+  $('btn-dec-ok').addEventListener('click', () => attempt('Contexto correcto', current.envelope, current.ctx));
+  $('btn-dec-id').addEventListener('click', () => attempt('Sobre copiado al registro 43', current.envelope, { ...current.ctx, id: current.ctx.id === '43' ? '44' : '43' }));
+  $('btn-dec-purpose').addEventListener('click', () => {
+    const purpose = current.ctx.purpose === 'registration_payload' ? 'pending_registration_payload' : 'registration_payload';
+    attempt(`Sobre movido a la columna de ${purpose}`, current.envelope, { ...current.ctx, purpose });
+  });
+  $('btn-dec-env').addEventListener('click', () => attempt('Respaldo de producción restaurado en staging', current.envelope, { ...current.ctx, env: current.ctx.env === 'staging' ? 'production' : 'staging' }));
+  $('btn-dec-flip').addEventListener('click', () => {
+    const parts = JSON.parse(current.envelope);
+    const ct = unb64(parts.ct);
+    ct[20] ^= 0x01;
+    attempt('Un bit de ct cambiado en la BD', JSON.stringify({ ...parts, ct: b64(ct) }), current.ctx);
+  });
+  $('btn-dec-nokek').addEventListener('click', async () => {
+    const parts = JSON.parse(current.envelope);
+    const saved = keyring.get(parts.kek);
+    keyring.delete(parts.kek);
+    try { await attempt('Copia de la BD sin el archivo de la KEK', current.envelope, current.ctx); }
+    finally { keyring.set(parts.kek, saved); }
+  });
+
+  $('btn-rot').addEventListener('click', async () => {
+    const newId = $('rot-id').value.trim();
+    const mode = document.querySelector('input[name="kek-mode"]:checked').value;
+    try {
+      await generateKek(newId, mode);
+    } catch (e) { $('rot-result').innerHTML = chip(false, e.message); return; }
+    const before = JSON.parse(current.envelope);
+    const dek = await unwrapDek(before, current.ctx);
+    let wk;
+    try { wk = await seal(keyring.get(newId).key, dek, aadOf(current.ctx)); }
+    finally { dek.fill(0); }
+    const after = { ...before, kek: newId, wk: b64(wk) };
+    const oldId = activeId;
+    activeId = newId;
+    current = { envelope: JSON.stringify(after), ctx: current.ctx };
+    $('env-out').textContent = JSON.stringify(after, null, 2);
+    const row = (f, a, b) => `<tr><td><code>${f}</code></td><td class="v">${esc(short(a, 30))}</td><td class="v">${esc(short(b, 30))}</td><td>${a === b ? '<span class="chip">Igual</span>' : '<span class="chip chip--kek">Cambió</span>'}</td></tr>`;
+    $('rot-diff').tBodies[0].innerHTML = row('kek', before.kek, after.kek) + row('wk', before.wk, after.wk) + row('ct', before.ct, after.ct);
+    try {
+      await decryptEnvelope(current.envelope, current.ctx);
+      $('rot-result').innerHTML = `${chip(true, 'Descifra con la KEK nueva')} <span class="small"><code>${esc(oldId)}</code> queda en el llavero solo para leer sobres viejos.</span>`;
+    } catch (e) {
+      $('rot-result').innerHTML = chip(false, e.message);
+    }
+    const nextNum = (newId.match(/(\d+)$/) || [])[1];
+    if (nextNum) $('rot-id').value = newId.replace(/\d+$/, String(Number(nextNum) + 1).padStart(nextNum.length, '0'));
+  });
+
+  // Start in a working state: one file-mode KEK, one encrypted sample, one successful read.
+  for (const id of ['btn-enc', 'btn-dec-ok', 'btn-dec-id', 'btn-dec-purpose', 'btn-dec-env', 'btn-dec-flip', 'btn-dec-nokek', 'btn-rot', 'btn-restore-13', 'btn-restore-2']) $(id).disabled = true;
+  if (!window.crypto || !crypto.subtle) {
+    $('kek-file').textContent = 'Este navegador no ofrece WebCrypto, así que la prueba no puede correr.';
+    $('btn-gen').disabled = true;
+    return;
+  }
+  doGenerate().then(() => {
+    $('kek-id').value = 'registry-2026-11b';
+    if (current) attempt('Contexto correcto', current.envelope, current.ctx);
+  });
+})();
+</script>

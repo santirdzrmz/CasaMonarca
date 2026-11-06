@@ -22,3 +22,18 @@ Thumbs.db
 # Local AI instructions
 # =========================
 AGENTS.md
+.claude/settings.local.json
+
+# =========================
+# Secrets, keys and data dumps
+# (API/ and Web/ have their own .env rules; committed *.example and .env.dev stay tracked)
+# =========================
+/.env
+*.key
+*.pem
+*.p12
+*.pfx
+*.age
+*.sql
+*.sql.gz
+*.dump
