@@ -22,6 +22,7 @@ class MigrantRegistryStatisticsApiTest extends TestCase
     private const EDU_MINOR = 'r65ec8fd31b8f421eb0d6c50bdd9115b3';
     private const MEXICO_ENTRY = 'rb5d53bd5db9045dd8fe0b1dc849acdf4';
     private const DESTINATION = 'r2bbdd2ae059d41b988ef4e55381fafde';
+    private const SERVICES = 'r245485c3e8c5489ba5f554637d370ad7';
 
     private const URL = '/registry/migrants/statistics';
 
@@ -118,6 +119,33 @@ class MigrantRegistryStatisticsApiTest extends TestCase
             ->assertJsonPath('data.total', 1);
     }
 
+    public function test_requested_services_count_people_per_service_and_per_area(): void
+    {
+        $this->entry(['attention' => '2026-01-10', 'services' => ['Atención psicológica', 'Atención psiquiátrica', 'Orientación / Asesoría legal']]);
+        $this->entry(['attention' => '2026-02-10', 'services' => ['Ropa y Calzado', 'Atención psicológica']]);
+        $this->entry(['attention' => '2026-02-11', 'services' => []]);
+        $this->entry(['attention' => '2026-02-12']);
+        $this->entry(['attention' => '2026-02-12', 'services' => ['Ropa y Calzado']], 'pending_review');
+
+        $services = $this->actingAs($this->enrolled(UserRole::Admin))->getJson(self::URL)->assertOk()->json('data.requestedServices');
+
+        $this->assertSame(2, $services['respondents']);
+        $this->assertSame(2, $services['noAnswer']);
+        $this->assertSame(['value' => 'Atención psicológica', 'count' => 2], $services['services'][0]);
+        // Every questionnaire option is listed, even with no requests.
+        $this->assertContains(['value' => 'Pañales para adultos', 'count' => 0], $services['services']);
+
+        // Psychological + psychiatric is one person in the psychosocial area, not two.
+        $this->assertSame(
+            ['humanitarian' => 1, 'legal' => 1, 'psychosocial' => 2],
+            array_column($services['areas'], 'count', 'key'),
+        );
+        $this->assertSame(
+            [['month' => '2026-01', 'counts' => ['legal' => 1, 'psychosocial' => 1]], ['month' => '2026-02', 'counts' => ['humanitarian' => 1, 'psychosocial' => 1]]],
+            $services['areasByMonth'],
+        );
+    }
+
     public function test_invalid_ranges_are_rejected(): void
     {
         $this->actingAs($this->enrolled(UserRole::Admin))
@@ -127,7 +155,7 @@ class MigrantRegistryStatisticsApiTest extends TestCase
     }
 
     /**
-     * @param  array<string, string>  $values
+     * @param  array<string, string|list<string>>  $values
      */
     private function entry(array $values, string $status = 'approved'): MigrantRegistryEntry
     {
@@ -135,6 +163,7 @@ class MigrantRegistryStatisticsApiTest extends TestCase
             'attention' => self::ATTENTION, 'gender' => self::GENDER, 'country' => self::COUNTRY,
             'civil' => self::CIVIL, 'literacy' => self::LITERACY, 'eduAdult' => self::EDU_ADULT,
             'eduMinor' => self::EDU_MINOR, 'mexico' => self::MEXICO_ENTRY, 'destination' => self::DESTINATION,
+            'services' => self::SERVICES,
         ];
         $answers = [];
 

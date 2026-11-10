@@ -53,6 +53,22 @@ const sample: RegistryStatistics = {
     p75: 12,
   },
   range: { dateBasis: 'attentionDate', from: null, to: null },
+  requestedServices: {
+    areas: [
+      { count: 4, key: 'humanitarian', label: 'Humanitaria', services: ['Ropa y Calzado'] },
+      { count: 3, key: 'legal', label: 'Legal', services: ['Orientación / Asesoría legal'] },
+      { count: 2, key: 'psychosocial', label: 'Psicosocial', services: ['Atención psicológica'] },
+    ],
+    areasByMonth: [{ counts: { humanitarian: 4, legal: 3 }, month: '2026-03' }],
+    label: 'Servicios solicitados',
+    noAnswer: 2,
+    respondents: 8,
+    services: [
+      { count: 4, value: 'Ropa y Calzado' },
+      { count: 3, value: 'Orientación / Asesoría legal' },
+      { count: 2, value: 'Atención psicológica' },
+    ],
+  },
   total: 10,
 }
 
@@ -75,6 +91,17 @@ describe('MigrantStatisticsPage', () => {
     for (const title of ['Nacionalidad (país de origen)', 'Nivel educativo', 'Género', 'Estado civil', 'Destino final', 'Sabe leer y escribir']) {
       expect(screen.getByRole('heading', { name: title })).toBeInTheDocument()
     }
+  })
+
+  it('shows requested services per attention area over the people who answered', async () => {
+    render(<MigrantStatisticsPage user={user} />)
+
+    expect(await screen.findByRole('heading', { name: 'Servicios solicitados' })).toBeInTheDocument()
+    const areas = within(screen.getByRole('group', { name: 'Personas por área de atención' }))
+    expect(areas.getByText('Área Legal')).toBeInTheDocument()
+    expect(areas.getByText('3')).toBeInTheDocument()
+    expect(areas.getByText('25% de quienes respondieron · 1 servicios')).toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Servicios solicitados' })).toHaveTextContent('Atención psicológica')
   })
 
   it('folds countries past the top ten into one row', async () => {

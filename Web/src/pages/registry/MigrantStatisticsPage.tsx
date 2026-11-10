@@ -212,6 +212,8 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
     values: { count: month.count },
   }))
   const dayBins = days.bins.map((bin) => ({ key: bin.label, label: bin.label, values: { count: bin.count } }))
+  const services = data.requestedServices
+  const serviceRows = toRows(services.services)
 
   const categoryCards: { key: StatisticsDimensionKey; rows: BarListRow[]; subtitle?: string }[] = [
     {
@@ -391,6 +393,54 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
                 caption={t('Days from entering Mexico to Monterrey', 'Días de México a Monterrey')}
                 columns={[t('Time', 'Tiempo'), t('People', 'Personas')]}
                 rows={days.bins.map((bin) => [bin.label, formatCount(bin.count)])}
+              />
+            </section>
+
+            <section className="workspace-panel viz-card">
+              <div>
+                <h2 className="viz-card__title">{t('Requested services', 'Servicios solicitados')}</h2>
+                <p className="viz-card__subtitle">
+                  {t(
+                    `A person can request several services. Shares are over the ${formatCount(services.respondents)} people who answered; ${formatCount(services.noAnswer)} did not answer or were not asked.`,
+                    `Una persona puede pedir varios servicios. Los porcentajes son sobre las ${formatCount(services.respondents)} personas que respondieron; ${formatCount(services.noAnswer)} no respondieron o no se les preguntó.`,
+                  )}
+                </p>
+              </div>
+              <div aria-label={t('People per attention area', 'Personas por área de atención')} className="viz-kpis" role="group">
+                {services.areas.map((area) => (
+                  <div className="viz-tile" key={area.key}>
+                    <p className="viz-tile__label">{t(`${area.label} area`, `Área ${area.label}`)}</p>
+                    <p className="viz-tile__value">{formatCount(area.count)}</p>
+                    <div aria-hidden="true" className="viz-meter">
+                      <div className="viz-meter__fill" style={{ width: services.respondents > 0 ? `${(area.count / services.respondents) * 100}%` : 0 }} />
+                    </div>
+                    <p className="viz-tile__note" title={area.services.join(' · ')}>
+                      {t(
+                        `${formatPercent(area.count, services.respondents)} of those who answered · ${area.services.length} services`,
+                        `${formatPercent(area.count, services.respondents)} de quienes respondieron · ${area.services.length} servicios`,
+                      )}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <BarList ariaLabel={t('Requested services', 'Servicios solicitados')} rows={serviceRows} total={services.respondents} />
+              <DataTable
+                caption={t('Requested services', 'Servicios solicitados')}
+                columns={[t('Service', 'Servicio'), t('Area', 'Área'), t('People', 'Personas'), t('Share', 'Porcentaje')]}
+                rows={services.services.map((service) => [
+                  service.value,
+                  services.areas.find((area) => area.services.includes(service.value))?.label ?? '—',
+                  formatCount(service.count),
+                  formatPercent(service.count, services.respondents),
+                ])}
+              />
+              <DataTable
+                caption={t('People per area by month', 'Personas por área y mes')}
+                columns={[t('Month', 'Mes'), ...services.areas.map((area) => area.label)]}
+                rows={services.areasByMonth.map((month) => [
+                  formatMonth(month.month, 'long'),
+                  ...services.areas.map((area) => formatCount(month.counts[area.key] ?? 0)),
+                ])}
               />
             </section>
 
