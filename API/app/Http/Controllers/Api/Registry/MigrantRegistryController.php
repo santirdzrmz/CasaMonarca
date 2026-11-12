@@ -11,6 +11,7 @@ use App\Models\MigrantRegistryEntry;
 use App\Services\Registry\MigrantQuestionnaireDefinitionService;
 use App\Services\Registry\MigrantRegistryDocumentService;
 use App\Services\Registry\MigrantRegistryService;
+use App\Services\Registry\RegistryEntryPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,12 +26,14 @@ class MigrantRegistryController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $entries = MigrantRegistryEntry::query()
+            ->with(['creator:id,name,email,role', 'signatures', 'statusHistory'])
+            ->latest()
+            ->where('current_status', '!=', MigrantRegistryService::STATUS_DRAFT)
+            ->get();
+
         return response()->json([
-            'data' => MigrantRegistryEntry::query()
-                ->with(['creator:id,name,email,role', 'signatures', 'statusHistory'])
-                ->latest()
-                ->where('current_status', '!=', MigrantRegistryService::STATUS_DRAFT)
-                ->get(),
+            'data' => app(RegistryEntryPresenter::class)->presentMany($entries, $request->user()),
         ]);
     }
 
@@ -113,23 +116,27 @@ class MigrantRegistryController extends Controller
 
     public function pendingApproval(Request $request): JsonResponse
     {
+        $entries = MigrantRegistryEntry::query()
+            ->with(['creator:id,name,email,role', 'signatures', 'statusHistory'])
+            ->where('current_status', MigrantRegistryService::STATUS_PENDING_APPROVAL)
+            ->latest()
+            ->get();
+
         return response()->json([
-            'data' => MigrantRegistryEntry::query()
-                ->with(['creator:id,name,email,role', 'signatures', 'statusHistory'])
-                ->where('current_status', MigrantRegistryService::STATUS_PENDING_APPROVAL)
-                ->latest()
-                ->get(),
+            'data' => app(RegistryEntryPresenter::class)->presentMany($entries, $request->user()),
         ]);
     }
 
     public function pendingReview(Request $request): JsonResponse
     {
+        $entries = MigrantRegistryEntry::query()
+            ->with(['creator:id,name,email,role', 'signatures', 'statusHistory'])
+            ->where('current_status', MigrantRegistryService::STATUS_PENDING_REVIEW)
+            ->latest()
+            ->get();
+
         return response()->json([
-            'data' => MigrantRegistryEntry::query()
-                ->with(['creator:id,name,email,role', 'signatures', 'statusHistory'])
-                ->where('current_status', MigrantRegistryService::STATUS_PENDING_REVIEW)
-                ->latest()
-                ->get(),
+            'data' => app(RegistryEntryPresenter::class)->presentMany($entries, $request->user()),
         ]);
     }
 
@@ -185,12 +192,15 @@ class MigrantRegistryController extends Controller
             abort_unless((int) $migrantRegistryEntry->created_by === (int) request()->user()?->getKey(), 403);
         }
 
+        $presenter = app(RegistryEntryPresenter::class);
+        abort_unless($presenter->isVisibleTo($migrantRegistryEntry, request()->user()), 403);
+
         return response()->json([
-            'data' => $migrantRegistryEntry->load([
+            'data' => $presenter->present($migrantRegistryEntry->load([
                 'creator:id,name,email,role',
                 'signatures',
                 'statusHistory',
-            ]),
+            ]), request()->user()),
         ]);
     }
 

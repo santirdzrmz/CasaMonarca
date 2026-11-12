@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\MigrantArcoRequest;
 use App\Models\User;
+use App\Services\Registry\RegistryEntryPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,7 +23,9 @@ class MigrantArcoController extends Controller
             $query->where('requested_by', $actor->id);
         }
 
-        return response()->json(['data' => $query->get()]);
+        $presenter = app(RegistryEntryPresenter::class);
+
+        return response()->json(['data' => $query->get()->map(fn (MigrantArcoRequest $arco) => $presenter->presentArco($arco))->all()]);
     }
 
     public function show(Request $request, MigrantArcoRequest $migrantArcoRequest): JsonResponse
@@ -34,6 +37,8 @@ class MigrantArcoController extends Controller
             abort(403);
         }
 
-        return response()->json(['data' => $migrantArcoRequest->load(['registryEntry', 'requester:id,name,email,role', 'signatures', 'statusHistory', 'artifact'])]);
+        return response()->json(['data' => app(RegistryEntryPresenter::class)->presentArco(
+            $migrantArcoRequest->load(['registryEntry', 'requester:id,name,email,role', 'signatures', 'statusHistory', 'artifact']),
+        )]);
     }
 }

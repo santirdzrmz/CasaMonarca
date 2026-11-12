@@ -37,6 +37,14 @@ enum AuditEventType: string
     case DocumentDeleted = 'document.deleted';
     case DocumentVerificationBundleDownloaded = 'document.verification_bundle.downloaded';
     case DocumentVerificationPackageDownloaded = 'document.verification_package.downloaded';
+    case RegistryKeysUnlocked = 'registry.keys.unlocked';
+    case RegistryKeysUnlockFailed = 'registry.keys.unlock.failed';
+    case RegistryKeysLocked = 'registry.keys.locked';
+    case RegistryAccessRequested = 'registry.access.requested';
+    case RegistryAccessGranted = 'registry.access.granted';
+    case RegistryAccessDenied = 'registry.access.denied';
+    case RegistryAccessRevoked = 'registry.access.revoked';
+    case RegistryAccessUsed = 'registry.access.used';
     case AccountInviteCreated = 'account.invite.created';
     case AccountInviteCreationDenied = 'account.invite.creation.denied';
     case AccountInviteVerified = 'account.invite.verified';

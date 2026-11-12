@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AppIcon } from '../../components/ui/AppIcon'
 import { MigrantQuestionnaireViewer } from '../../components/registry/MigrantQuestionnaireViewer'
 import type { AuthenticatedUser } from '../../lib/auth'
+import { CoordinatorAccessPanel } from '../../components/registry/CoordinatorAccessPanel'
+import { OperatorAccessPanel } from '../../components/registry/OperatorAccessPanel'
 import { formatRegistryValue } from '../../lib/registryDisplay'
 import {
   ApiRequestError,
@@ -385,6 +387,8 @@ export function MigrantsApprovalsPage({ onSessionExpired, user }: MigrantsApprov
 
   return (
     <section className="workspace-stack">
+      {user.role === 'non_coordinator' ? <OperatorAccessPanel onSessionExpired={onSessionExpired} /> : null}
+      {canApprove(user.role) ? <CoordinatorAccessPanel onSessionExpired={onSessionExpired} /> : null}
       <section className="workspace-panel dashboard-signature-queue">
         <div className="dashboard-signature-queue__header">
           <div>

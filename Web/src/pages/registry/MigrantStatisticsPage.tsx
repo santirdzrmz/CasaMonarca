@@ -5,6 +5,8 @@ import { ColumnChart, type ColumnSeries } from '../../components/charts/ColumnCh
 import { DataTable } from '../../components/charts/DataTable'
 import { formatCount, formatMonth, formatPercent } from '../../components/charts/chartFormat'
 import '../../components/charts/charts.css'
+import { KeyStatusBar } from '../../components/registry/KeyStatusBar'
+import { KeyUnlockPanel } from '../../components/registry/KeyUnlockPanel'
 import { ApiRequestError } from '../../lib/api'
 import type { AuthenticatedUser } from '../../lib/auth'
 import { translate as t } from '../../lib/i18n'
@@ -114,6 +116,8 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
   const [data, setData] = useState<RegistryStatistics | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [keysLocked, setKeysLocked] = useState(false)
+  const [reloadCount, setReloadCount] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -123,6 +127,7 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
         if (active) {
           setData(response)
           setError(null)
+          setKeysLocked(false)
         }
       })
       .catch((loadError) => {
@@ -132,6 +137,14 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
 
         if (loadError instanceof ApiRequestError && loadError.status === 401) {
           onSessionExpired?.()
+          return
+        }
+
+        // 423: las estadísticas se calculan con las llaves del usuario y aún no las desbloquea.
+        if (loadError instanceof ApiRequestError && loadError.status === 423) {
+          setData(null)
+          setKeysLocked(true)
+          setError(null)
           return
         }
 
@@ -146,7 +159,7 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
     return () => {
       active = false
     }
-  }, [onSessionExpired, range])
+  }, [onSessionExpired, range, reloadCount])
 
   const changeRange = (next: Range) => {
     setLoading(true)
@@ -188,7 +201,15 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
     return (
       <section className="workspace-stack viz-root">
         <section className="workspace-panel">
-          {error ? (
+          {keysLocked ? (
+            <KeyUnlockPanel
+              onSessionExpired={onSessionExpired}
+              onUnlocked={() => {
+                setLoading(true)
+                setReloadCount((count) => count + 1)
+              }}
+            />
+          ) : error ? (
             <div className="login-feedback login-feedback--error">{error}</div>
           ) : (
             <p className="viz-empty">{loading ? t('Loading statistics…', 'Cargando estadísticas…') : null}</p>
@@ -232,6 +253,13 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
 
   return (
     <section className="workspace-stack viz-root">
+      <KeyStatusBar
+        onLocked={() => {
+          setData(null)
+          setLoading(true)
+          setReloadCount((count) => count + 1)
+        }}
+      />
       <section className="workspace-panel">
         <div className="viz-filters" aria-label={t('Statistics filters', 'Filtros de estadísticas')}>
           <div className="viz-filters__group">
