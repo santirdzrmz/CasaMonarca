@@ -1,12 +1,14 @@
 <?php
 
 use App\Http\Middleware\EnsureAccountActive;
+use App\Http\Middleware\LoadRegistryKeys;
 use App\Http\Middleware\RequireActingDepartment;
 use App\Http\Middleware\RequireFeatureEnabled;
 use App\Http\Middleware\RequireRole;
 use App\Http\Middleware\RequireSecurityEnrollment;
 use App\Http\Middleware\SetSecurityHeaders;
 use App\Http\Middleware\TrustConfiguredProxies;
+use App\Services\Security\Encryption\KeysLockedException;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -60,6 +62,7 @@ return Application::configure(basePath: dirname(__DIR__))
         }
 
         $middleware->alias([
+            'loadRegistryKeys' => LoadRegistryKeys::class,
             'requireActiveAccount' => EnsureAccountActive::class,
             'requireDepartment' => RequireActingDepartment::class,
             'requireFeature' => RequireFeatureEnabled::class,
@@ -81,6 +84,13 @@ return Application::configure(basePath: dirname(__DIR__))
             return response()->json([
                 'message' => 'CSRF token mismatch.',
             ], 419);
+        });
+
+        $exceptions->render(function (KeysLockedException $exception, Request $request) {
+            return response()->json([
+                'message' => 'Registry keys are locked. Unlock your keys to continue.',
+                'code' => 'registry_keys_locked',
+            ], 423);
         });
 
         $exceptions->render(function (DecryptException $exception, Request $request) {

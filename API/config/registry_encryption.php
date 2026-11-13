@@ -18,4 +18,23 @@ return [
     'active_kek_id' => env('REGISTRY_KEK_ID'),
     'key_directory' => env('REGISTRY_KEY_DIRECTORY'),
     'context_environment' => env('REGISTRY_ENCRYPTION_ENV', env('APP_ENV', 'production')),
+
+    /*
+    | Per-user keys (public-key model). See docs/operations/registry-user-keys.md.
+    |
+    | mode             file: the symmetric file KEK (current behaviour).
+    |                  publickey: each record's DEK is wrapped with a PUBLIC key per domain
+    |                  (cand = before approval, proc = approved); opening it needs the user's private
+    |                  key, delivered by an admin and unlocked in the user's session.
+    | public_keys      Active public key per domain (base64). Private keys do NOT live on the server.
+    | session_key_ttl  Seconds unlocked keys stay available in the session.
+    | operator_session_ttl  Seconds an operator's session key (Ks) lives; grants are tied to it.
+    */
+    'mode' => env('REGISTRY_ENCRYPTION_MODE', 'file'),
+    'public_keys' => [
+        'cand' => ['id' => env('REGISTRY_PK_CAND_ID', 'pk:cand-1'), 'public' => env('REGISTRY_PK_CAND_PUBLIC')],
+        'proc' => ['id' => env('REGISTRY_PK_PROC_ID', 'pk:proc-1'), 'public' => env('REGISTRY_PK_PROC_PUBLIC')],
+    ],
+    'session_key_ttl' => (int) env('REGISTRY_SESSION_KEY_TTL', 3600),
+    'operator_session_ttl' => (int) env('REGISTRY_OPERATOR_SESSION_TTL', 14400),
 ];

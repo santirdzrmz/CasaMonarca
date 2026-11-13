@@ -46,6 +46,12 @@ class MigrantArcoRequest extends Model
         'proposed_payload_json' => ['arco_proposed_payload', null],
     ];
 
+    /** ARCO requests describe people already registered: they use the processed key. */
+    public function encryptionKeyDomain(string $column): ?string
+    {
+        return 'proc';
+    }
+
     public function registryEntry(): BelongsTo
     {
         return $this->belongsTo(MigrantRegistryEntry::class, 'registry_entry_id')->withTrashed();

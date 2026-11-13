@@ -66,6 +66,8 @@ use App\Http\Controllers\Api\Registry\MigrantRegistryApprovalVerifyController;
 use App\Http\Controllers\Api\Registry\MigrantRegistryBulkApprovalOptionsController;
 use App\Http\Controllers\Api\Registry\MigrantRegistryBulkApprovalVerifyController;
 use App\Http\Controllers\Api\Registry\MigrantRegistryController;
+use App\Http\Controllers\Api\Registry\RegistryAccessController;
+use App\Http\Controllers\Api\Registry\RegistryKeysController;
 use App\Http\Controllers\Api\Registry\MigrantRegistryDocumentController;
 use App\Http\Controllers\Api\Registry\MigrantRegistryDocumentDownloadOptionsController;
 use App\Http\Controllers\Api\Registry\MigrantRegistryDocumentDownloadVerifyController;
@@ -160,7 +162,25 @@ Route::middleware('web')->group(function (): void {
         Route::post('/documents/{document}/delete/verify', DocumentDeleteVerifyController::class);
     });
 
-    Route::middleware(['auth', 'requireActiveAccount', 'requireSecurityEnrollment', 'requireDepartment', 'requireRole:admin,coordinator,non_coordinator,volunteer'])->prefix('registry/migrants')->group(function (): void {
+    Route::middleware(['auth', 'requireActiveAccount', 'requireSecurityEnrollment', 'requireRole:non_coordinator'])->prefix('registry/access')->group(function (): void {
+        Route::get('/mine', [RegistryAccessController::class, 'mine']);
+        Route::post('/requests', [RegistryAccessController::class, 'store'])->middleware('throttle:30,1');
+    });
+
+    Route::middleware(['auth', 'requireActiveAccount', 'requireSecurityEnrollment', 'requireRole:admin,coordinator', 'loadRegistryKeys'])->prefix('registry/access')->group(function (): void {
+        Route::get('/requests', [RegistryAccessController::class, 'index']);
+        Route::post('/requests/{grant}/grant', [RegistryAccessController::class, 'grant'])->whereNumber('grant')->middleware('throttle:30,1');
+        Route::post('/requests/{grant}/deny', [RegistryAccessController::class, 'deny'])->whereNumber('grant');
+        Route::post('/requests/{grant}/revoke', [RegistryAccessController::class, 'revoke'])->whereNumber('grant');
+    });
+
+    Route::middleware(['auth', 'requireActiveAccount', 'requireSecurityEnrollment', 'requireRole:admin,coordinator'])->prefix('registry/keys')->group(function (): void {
+        Route::get('/status', [RegistryKeysController::class, 'status']);
+        Route::post('/unlock', [RegistryKeysController::class, 'unlock'])->middleware('throttle:10,1');
+        Route::delete('/unlock', [RegistryKeysController::class, 'lock']);
+    });
+
+    Route::middleware(['auth', 'requireActiveAccount', 'requireSecurityEnrollment', 'requireDepartment', 'requireRole:admin,coordinator,non_coordinator,volunteer', 'loadRegistryKeys'])->prefix('registry/migrants')->group(function (): void {
         Route::get('/', [MigrantRegistryController::class, 'index']);
         Route::post('/', [MigrantRegistryController::class, 'store']);
         Route::get('/corrections', [MigrantRegistryController::class, 'corrections']);

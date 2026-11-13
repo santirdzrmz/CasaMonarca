@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Models\Casts\EncryptedPayload;
 use App\Models\Concerns\HasEncryptedPayloads;
+use App\Services\Registry\MigrantRegistryService;
+use App\Services\Security\Encryption\PublicKeyKekProvider;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -38,6 +40,26 @@ class MigrantRegistryEntry extends Model
         'payload_json' => ['registration_payload', '{}'],
         'pending_payload_json' => ['pending_registration_payload', null],
     ];
+
+    /**
+     * Before approval the payload is sealed with the candidates key; once approved, with the processed key.
+     * Once sealed with the processed key it never goes back (even if a modification is requested).
+     * A proposed change (`pending_payload_json`) always uses the candidates key.
+     */
+    public function encryptionKeyDomain(string $column): ?string
+    {
+        if ($column === 'pending_payload_json') {
+            return 'cand';
+        }
+
+        if ($this->current_status === MigrantRegistryService::STATUS_APPROVED) {
+            return 'proc';
+        }
+
+        $kek = json_decode((string) ($this->attributes['payload_json_enc'] ?? ''), true)['kek'] ?? null;
+
+        return is_string($kek) && PublicKeyKekProvider::domainOf($kek) === 'proc' ? 'proc' : 'cand';
+    }
 
     public function signatures(): HasMany
     {

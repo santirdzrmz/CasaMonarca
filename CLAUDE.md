@@ -68,6 +68,8 @@ cd Web && npm run qa:visual                                 # Playwright visual 
 | `registry:synthetic` | Generate or purge fake registry data (`docs/operations/synthetic-data.md`) |
 | `registry:kek-generate <id>` | Create a registry KEK file |
 | `registry:encrypt-backfill [--dry-run] [--purge-plaintext]` | Encrypt existing payloads |
+| `registry:keys-init`, `keys-enroll <email>`, `keys-grant <email>`, `keys-revoke <email>`, `keys-rewrap` | Per-user keys and rotation (`REGISTRY_ENCRYPTION_MODE=publickey`); see `docs/operations/registry-user-keys.md` |
+| `registry:demo-setup`, `registry:demo-totp <email>` | LOCAL only: demo users per level, demo keys and TOTP codes; see `docs/operations/registry-poc-demo.md` |
 | `verification-packages:generate-signing-key` | Signing keys for exported verification packages |
 | `security-challenges:expire` | Expire stale WebAuthn challenge intents |
 | `registry:migrant-drafts:purge` | Delete expired drafts |
