@@ -25,7 +25,43 @@ class MigrantRegistryStatisticsService
 
     private const QUESTION_FINAL_DESTINATION = 'r2bbdd2ae059d41b988ef4e55381fafde';
 
+    /** "¿Qué servicio le gustaría recibir…?" — multiple selection. */
+    private const QUESTION_REQUESTED_SERVICES = 'r245485c3e8c5489ba5f554637d370ad7';
+
     public const MISSING = 'Sin respuesta';
+
+    /**
+     * Requested services grouped by the attention area that delivers them. A person
+     * counts once per area even when they ask for several services in it.
+     */
+    private const SERVICE_AREAS = [
+        'humanitarian' => [
+            'label' => 'Humanitaria',
+            'services' => [
+                'Servicios Humanitarios (Alimentación, Regadera y baño, Kits de Cama, Kits de higiene)',
+                'Ropa y Calzado',
+                'Insumos para bebés (pañales, leche)',
+                'Insumos para mujeres (toallas femeninas)',
+                'Pañales para adultos',
+                'Búsqueda de vivienda',
+                'Canalización a Centro de Salud',
+            ],
+        ],
+        'legal' => [
+            'label' => 'Legal',
+            'services' => [
+                'Orientación / Asesoría legal',
+                'Apoyo en obtención de RFC, CURP o NSS',
+            ],
+        ],
+        'psychosocial' => [
+            'label' => 'Psicosocial',
+            'services' => [
+                'Atención psicológica',
+                'Atención psiquiátrica',
+            ],
+        ],
+    ];
 
     /** Lowest to highest; both education questions share these values. */
     private const EDUCATION_ORDER = [
@@ -71,6 +107,11 @@ class MigrantRegistryStatisticsService
             $byMonth[$key] = [];
         }
 
+        $serviceCounts = array_fill_keys($this->choiceValues($definition, self::QUESTION_REQUESTED_SERVICES), 0);
+        $areaCounts = array_fill_keys(array_keys(self::SERVICE_AREAS), 0);
+        $areaByMonth = [];
+        $serviceRespondents = 0;
+
         $arrivals = [];
         $days = [];
         $daysMissing = 0;
@@ -100,6 +141,23 @@ class MigrantRegistryStatisticsService
                 $value = ($dimension['resolve'])($answers);
                 $counts[$key][$value] = ($counts[$key][$value] ?? 0) + 1;
                 $byMonth[$key][$month][$value] = ($byMonth[$key][$month][$value] ?? 0) + 1;
+            }
+
+            $services = $this->choices($answers[self::QUESTION_REQUESTED_SERVICES] ?? null);
+
+            if ($services !== []) {
+                $serviceRespondents++;
+
+                foreach ($services as $service) {
+                    $serviceCounts[$service] = ($serviceCounts[$service] ?? 0) + 1;
+                }
+
+                foreach (self::SERVICE_AREAS as $areaKey => $area) {
+                    if (array_intersect($services, $area['services']) !== []) {
+                        $areaCounts[$areaKey]++;
+                        $areaByMonth[$month][$areaKey] = ($areaByMonth[$month][$areaKey] ?? 0) + 1;
+                    }
+                }
             }
 
             $enteredMexico = $this->date($answers[self::QUESTION_MEXICO_ENTRY_DATE] ?? null);
@@ -137,7 +195,52 @@ class MigrantRegistryStatisticsService
                 ),
             ])->all(),
             'mexicoToMonterrey' => $this->daysSummary($days, $daysMissing, $daysInconsistent),
+            'requestedServices' => [
+                'label' => 'Servicios solicitados',
+                'respondents' => $serviceRespondents,
+                'noAnswer' => $total - $serviceRespondents,
+                'services' => $this->categories($serviceCounts, [], false),
+                'areas' => collect(self::SERVICE_AREAS)->map(fn (array $area, string $key): array => [
+                    'key' => $key,
+                    'label' => $area['label'],
+                    'count' => $areaCounts[$key],
+                    'services' => $area['services'],
+                ])->values()->all(),
+                'areasByMonth' => array_map(
+                    fn (string $month): array => ['month' => $month, 'counts' => $areaByMonth[$month] ?? (object) []],
+                    $months,
+                ),
+            ],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $definition
+     * @return list<string>
+     */
+    private function choiceValues(array $definition, string $questionId): array
+    {
+        $question = collect($definition['questions'] ?? [])->firstWhere('id', $questionId) ?? [];
+
+        return array_values(array_filter(array_map(
+            fn (array $choice): ?string => is_string($choice['value'] ?? null) ? $choice['value'] : null,
+            $question['choices'] ?? [],
+        )));
+    }
+
+    /**
+     * Values of a multiple-selection answer, de-duplicated.
+     *
+     * @return list<string>
+     */
+    private function choices(mixed $answer): array
+    {
+        $value = is_array($answer) ? ($answer['value'] ?? null) : null;
+        $values = is_array($value) ? $value : [$value];
+
+        return array_values(array_unique(array_filter(
+            array_map(fn (mixed $item): ?string => is_string($item) && trim($item) !== '' ? trim($item) : null, $values),
+        )));
     }
 
     /**
