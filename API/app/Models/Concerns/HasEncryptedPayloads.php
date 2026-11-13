@@ -82,7 +82,7 @@ trait HasEncryptedPayloads
      */
     public function resealForKeyDomain(): void
     {
-        if (! config('registry_encryption.enabled') || config('registry_encryption.mode') !== 'publickey') {
+        if (! config('registry_encryption.enabled')) {
             return;
         }
 

@@ -109,11 +109,11 @@ Ordered by risk.
 6. **Encrypted backups only** — use `scripts/backup-database-encrypted.sh`.
 7. **Developer workstations**: bind local MySQL to `127.0.0.1`
    (`bind-address=127.0.0.1` in `my.ini`), use a strong `root` password, and
-   keep the registry KEK file readable only by the developer account.
+   keep registry private keys (`pk_*.age`, personal key files) off shared folders.
 
-## Related work on other branches
+## Related work
 
-- Registry payload encryption at rest (AES-256-GCM envelope):
-  `feature/registry-payload-encryption`. Until it is merged, questionnaire
-  payloads are stored in plaintext.
-- Department attribution for all modifications: `feature/department-attribution`.
+- Registry payload encryption with per-user keys: `registry-user-keys.md`.
+  It is merged but off until the domain keys are generated, so questionnaire
+  payloads are still stored in plaintext.
+- Department attribution for all modifications: `department-attribution.md`.

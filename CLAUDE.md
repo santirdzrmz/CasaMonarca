@@ -5,7 +5,7 @@ Subproject details live in `API/README.md`, `Web/README.md` and `API/docs/`.
 
 ## Handoff
 
-_Last updated: 2026-11-05._
+_Last updated: 2026-11-13._
 
 ### What the project does
 
@@ -66,9 +66,8 @@ cd Web && npm run qa:visual                                 # Playwright visual 
 |---|---|
 | `users:departments <email> [dept...] [--replace]` | View or assign departments |
 | `registry:synthetic` | Generate or purge fake registry data (`docs/operations/synthetic-data.md`) |
-| `registry:kek-generate <id>` | Create a registry KEK file |
-| `registry:encrypt-backfill [--dry-run] [--purge-plaintext]` | Encrypt existing payloads |
-| `registry:keys-init`, `keys-enroll <email>`, `keys-grant <email>`, `keys-revoke <email>`, `keys-rewrap` | Per-user keys and rotation (`REGISTRY_ENCRYPTION_MODE=publickey`); see `docs/operations/registry-user-keys.md` |
+| `registry:keys-init`, `keys-enroll <email>`, `keys-grant <email>`, `keys-revoke <email>`, `keys-rewrap` | Per-user registry keys and rotation; see `docs/operations/registry-user-keys.md` |
+| `registry:encrypt-backfill --private-dir=… [--dry-run] [--purge-plaintext]` | Encrypt existing payloads (needs the domain private keys to verify) |
 | `registry:demo-setup`, `registry:demo-totp <email>` | LOCAL only: demo users per level, demo keys and TOTP codes; see `docs/operations/registry-poc-demo.md` |
 | `verification-packages:generate-signing-key` | Signing keys for exported verification packages |
 | `security-challenges:expire` | Expire stale WebAuthn challenge intents |
@@ -80,62 +79,86 @@ cd Web && npm run qa:visual                                 # Playwright visual 
 - `upstream` is https://github.com/Krul-dev/CasaMonarca, maintained by Krul-dev. A fresh clone does not have this remote; add it with `git remote add upstream https://github.com/Krul-dev/CasaMonarca.git`.
 - Upstream flow: feature branch → PR to `staging` (1 approval + green CI) → `main`.
 - **Decision (2026-11):** do not open PRs to or merge into Krul-dev yet. The fork's `main` should be fully working on its own first.
+- **Remote names differ per clone.** The clones at `C:\Users\santi\CasaMonarca` and `OneDrive\Documents\GitHub\CasaMonarca` still have `origin` = Krul-dev and `fork` = the owner's fork; push with `git push fork …`. GitHub Desktop only lists `origin` branches, so rename the remotes (`origin`→`upstream`, `fork`→`origin`) to see the fork's branches there.
+- **No AI attribution.** Commits and PRs must not carry `Co-Authored-By: Claude` or "Generated with Claude Code" lines. Eight older merge/doc commits on `main` (`5cdb57e` … `02e2551`) still have one; rewriting them needs a force push and was not done.
 
 ### Current status
 
-- **Fork `main`:** upstream plus five fork feature branches, merged through `integration/fork-features` (still on origin):
-  1. `security-hardening`
-  2. `registry-payload-encryption`
-  3. `department-attribution`
-  4. `registry-statistics`
-  5. `synthetic-registry-data`
-- **Extra commit:** `c909edb` seeds the local admin with a department.
-- **CI:** the first CI run on the fork passed both jobs, Backend (PHP 8.3 / MySQL 5.7.44) and Frontend (Node 24). Run: https://github.com/santirdzrmz/CasaMonarca/actions/runs/41720552595
-- **Not yet run locally:** the merged app has not been started in Docker. The previous machine had no PHP, Node or Docker, so CI is the only verification so far.
+- **Fork `main`:** upstream plus the fork feature branches:
+  1. `security-hardening`, `registry-payload-encryption`, `department-attribution`, `registry-statistics`, `synthetic-registry-data` (through `integration/fork-features`, plus `c909edb` seeding the local admin's department).
+  2. `feature/demo-poc` (azulichis): **per-user registry keys**, now the only key scheme. The symmetric file KEK was removed.
+  3. `feature/statistics-requested-services`: "Servicios solicitados" card on Statistics.
+- **Verified locally (2026-11-13):** API 265 tests and Web 60 tests pass; lint, typecheck and build pass. CI runs on every push to `main`.
 
 ### Most recent work
 
-1. Merged the five fork branches and resolved the only conflict, in `API/.env.example`, by keeping both blocks.
-2. Fixed a fresh-install bug: department attribution is enforced by default, and the seeded admin had no department, so every write request was rejected. `DatabaseSeeder` now assigns `information_technology`, and `tests/Feature/DatabaseSeederDepartmentTest.php` covers it.
-3. Explained how data-at-rest encryption works, and wrote proposals for generating and storing the registry master key (KEK), with a diagram and a browser proof of concept. The proposals are in Spanish in `API/docs/operations/registry-kek-proposals.html`; open it in a browser, and the PoC uses WebCrypto.
+1. Merged `feature/demo-poc` and `feature/statistics-requested-services` into `main` through `integration/per-user-keys`.
+2. Removed the file-KEK mode entirely, because per-user keys is the chosen design:
+   - Deleted `FileKekProvider`, `RoutingKekProvider` and `registry:kek-generate`.
+   - Removed the `REGISTRY_KEK_ID`, `REGISTRY_KEY_DIRECTORY` and `REGISTRY_ENCRYPTION_MODE` settings.
+   - Deleted the KEK proposals (`registry-kek-proposals.html`) and the file-KEK guide (`registry-encryption-implementation.md`).
+   - `REGISTRY_ENCRYPTION_ENABLED` alone now turns on per-user keys.
+   - API responses still report `mode` as `publickey` or `off` for the Web panels.
+3. Added the requested-services statistics:
+   - per-service counts;
+   - people per area (Humanitaria, Legal, Psicosocial), counted once per area;
+   - people per area by month.
+
+   The service-to-area mapping is `SERVICE_AREAS` in `MigrantRegistryStatisticsService`. "Canalización a Centro de Salud" and "Búsqueda de vivienda" sit in Humanitaria, and "RFC, CURP o NSS" in Legal, pending confirmation from the team.
 
 ### Key decisions and why
 
-- **Envelope encryption for registry and ARCO payloads.** AES-256-GCM, with a random DEK per save, wrapped by a KEK.
+- **Envelope encryption for registry and ARCO payloads.** AES-256-GCM, with a random DEK per save.
   - Both layers bind `casamonarca|env|table|id|purpose|v1` as AAD, so ciphertext cannot be moved between records, columns or environments.
   - The envelope is stored in `<column>_enc` as `{v, alg, kek, wk, ct}`.
-  - Reads fail closed: if decryption fails, there is no fallback to plaintext.
-  - Encryption is disabled by default until a KEK exists. See `docs/operations/data-at-rest-encryption.md` and `registry-encryption-implementation.md`.
-- **KEK custody plan (proposal B, recommended).**
-  - Now: keep the KEK in a file and split an offline backup with Shamir 2-of-3 among Dirección, TI and Legal. This costs $0 and removes the key-loss risk.
-  - Later: move to AWS KMS (proposal C, about USD 2/month) once an AWS account exists, and to a KMS decryption broker as the long-term goal (proposal D).
-  - Rejected: passphrase-derived keys (no persistent process on shared hosting) and YubiKeys as the KEK (PIN or touch on every use would block background jobs).
-  - The `KekProvider` interface lets KMS replace the file provider without re-encrypting payloads.
+  - Reads fail closed: if decryption fails, there is no fallback to plaintext. Missing keys return HTTP 423 (`registry_keys_locked`).
+  - Encryption is off by default (`REGISTRY_ENCRYPTION_ENABLED=false`) until the domain keys exist. See `docs/operations/registry-user-keys.md` and `data-at-rest-encryption.md`.
+- **Per-user keys (decision 2026-11; replaces the file KEK and proposals A–D).**
+  - The DEK is wrapped with an X25519 public key per domain (`PublicKeyKekProvider`):
+    - `cand` covers records before approval and pending changes;
+    - `proc` covers approved records and ARCO;
+    - approval re-seals a record from `cand` to `proc`.
+  - The server holds only the public keys. The admin generates the domain private keys offline (`registry:keys-init`, `age` for a YubiKey) and delivers them to each coordinator or admin in a personal key file (`keys-enroll`, `keys-grant` with fingerprint check).
+  - Coordinators and admins unlock their keys per session (`POST /registry/keys/unlock`, TTL `REGISTRY_SESSION_KEY_TTL`).
+  - Operators read only records a coordinator grants them: a signed, time-limited grant tied to the operator's session key. Volunteers write but cannot read encrypted data.
+  - Known limits are listed in `registry-user-keys.md`:
+    - keys sit in the server cache during a session;
+    - the `/registry/keys/*` and `/registry/access/*` routes skip `requireDepartment`;
+    - files and PDFs are not covered yet.
+  - **Losing every copy of the domain private keys destroys the data.** Keep a second YubiKey or offline copy.
 - **Department attribution enforced by default** (`DEPARTMENT_ATTRIBUTION_ENFORCED=true`). Every change must carry an `X-Acting-Department` header for one of the user's departments. Tests turn it off in `phpunit.xml`.
 - **MySQL 5.7.44** in compose and CI, because that is what the HostGator target runs.
 
 ### Known bugs and open issues
 
-- **Registry encryption is off.** No KEK has been generated, so registry and ARCO payloads are stored as plaintext JSON.
+- **Registry encryption is off.** No domain keys have been generated outside the local demo, so registry and ARCO payloads are stored as plaintext JSON.
 - **Uploaded files are plaintext.** Migrant documents, ARCO archives and exports are not encrypted yet (Phase 3 in the encryption doc).
 - **Hosting encryption is unverified.** HostGator has not confirmed disk, snapshot or backup encryption.
-- **Stale encryption doc.** The "Current Implementation" table in `docs/operations/data-at-rest-encryption.md` still lists payload encryption as "Planned", but the code is merged.
+- **New Symfony advisories.** `composer audit` reports 7 (http-foundation, http-kernel, mime, routing; fixed in 7.4.23). Run `composer update` and the tests.
+- **Flaky tests.** `RegistrySyntheticDataTest::test_the_same_seed_produces_the_same_data_set` and `AuditEventApiTest::test_admin_can_search_audit_events_by_metadata_and_resource_ids` fail occasionally in full runs and pass when rerun.
 - **README mismatches.** The root `README.md` says MySQL 8.0, while compose and CI use 5.7.44. Its clone instructions point to Krul-dev and branch `feature/team-601-3-integrate`.
-- **Untested PoC.** The KEK proof of concept matches `EnvelopeCipher`'s format but has not been tested against the PHP code.
+- **Destructive demo guide.** `registry-poc-demo.md` runs `migrate:fresh` and drops older PoC databases, and it refers to a `registry-professor-model.patch` that is not in the repo.
 - **Committed dev secrets.** `API/.env.dev` contains a dev `APP_KEY` and the local admin password. Treat both as public and never reuse them outside local Docker.
 - **AI instruction files.** The root `.gitignore` ignores `AGENTS.md` as local AI instructions. `CLAUDE.md` is committed on this fork; drop it from any PR to upstream if the maintainers do not want it.
 
 ### Next steps
 
-1. On the new machine, run `./scripts/dev-init.sh` and smoke-test the main flows: log in as the local admin, create a registration and move it through review, then file an ARCO request.
-2. Decide on the KEK proposal. If it is B, add `registry:kek-split` and `registry:kek-restore` commands and write the custody procedure.
-3. Generate the KEK, then turn encryption on in stages:
-   1. Set `REGISTRY_ENCRYPTION_ENABLED=true` with `WRITE_PLAINTEXT=true`.
-   2. Run `registry:encrypt-backfill --dry-run`, then run the real backfill.
-   3. Test a restore of the key.
-   4. Only after that, run `--purge-plaintext`.
-4. Update the stale table in `data-at-rest-encryption.md` and fix the README's MySQL version.
-5. When the fork is stable, open a PR from a feature branch to `Krul-dev/CasaMonarca` `staging`.
+1. Run `composer update` for the Symfony advisories, then rerun the tests.
+2. Try the per-user keys end to end locally with `registry-poc-demo.md`. Note that it wipes the local database.
+3. Roll out per-user keys following `registry-user-keys.md`:
+   1. `keys-init` on the admin's computer.
+   2. `migrate`.
+   3. `keys-enroll` and `keys-grant` for each coordinator and admin.
+   4. Set `REGISTRY_ENCRYPTION_ENABLED=true` with `WRITE_PLAINTEXT=true`.
+   5. Run the backfill with `--private-dir`.
+   6. Test that a key backup restores.
+   7. Only then run `--purge-plaintext`.
+4. Close the per-user keys gaps:
+   - apply `requireDepartment` to the `/registry/keys/*` and `/registry/access/*` routes;
+   - add unlock screens to the other registry pages;
+   - encrypt files and PDFs.
+5. Confirm the service-to-area mapping for Statistics with the team, and fix the README's MySQL version.
+6. When the fork is stable, open a PR from a feature branch to `Krul-dev/CasaMonarca` `staging`.
 
 ### What is not in the repo
 
@@ -150,10 +173,12 @@ These have to be created or copied by hand. Secret values are never written here
 | `LOCAL_ADMIN_EMAIL`, `LOCAL_ADMIN_PASSWORD` | Choose them yourself. Used only when `APP_ENV=local`. |
 | `TRUSTED_HOSTS`, `TRUSTED_PROXIES`, `SESSION_SECURE_COOKIE`, `SESSION_DOMAIN` | The deployment's domain and proxy setup (`docs/operations/security-hardening.md`) |
 | `DEPARTMENT_ATTRIBUTION_ENFORCED` | Keep `true`; see `docs/operations/department-attribution.md` |
-| `REGISTRY_ENCRYPTION_ENABLED`, `REGISTRY_ENCRYPTION_WRITE_PLAINTEXT`, `REGISTRY_KEK_ID`, `REGISTRY_KEY_DIRECTORY`, `REGISTRY_ENCRYPTION_ENV` | Set during the encryption rollout. The key directory must be outside the repo and web root. |
+| `REGISTRY_ENCRYPTION_ENABLED`, `REGISTRY_ENCRYPTION_WRITE_PLAINTEXT`, `REGISTRY_ENCRYPTION_ENV` | Set during the encryption rollout (`registry-user-keys.md`). |
+| `REGISTRY_PK_CAND_ID`, `REGISTRY_PK_CAND_PUBLIC`, `REGISTRY_PK_PROC_ID`, `REGISTRY_PK_PROC_PUBLIC` | Public domain keys printed by `registry:keys-init`. Public keys only; private keys never go in `.env`. |
+| `REGISTRY_SESSION_KEY_TTL`, `REGISTRY_OPERATOR_SESSION_TTL` | How long unlocked keys and operator session keys last (seconds). |
 | `VERIFICATION_PACKAGE_SIGNING_KEY_ID`, `VERIFICATION_PACKAGE_SIGNING_PRIVATE_KEY_BASE64`, `VERIFICATION_PACKAGE_SIGNING_PUBLIC_KEY_BASE64` | Generate them with `php artisan verification-packages:generate-signing-key`. Leave them empty in dev for unsigned packages. |
 | `MAIL_*` | The production mail provider. Dev logs mail instead of sending it. |
-| `AWS_*` | Not used yet. Needed when KMS (proposal C) is adopted. |
+| `AWS_*` | Not used yet. Planned only for file encryption keys (KMS). |
 | `FEATURE_ARCO_ENABLED`, `ARCO_ENABLED_TYPES`, `FEATURE_MIGRANT_DOCUMENTS_ENABLED`, `MIGRANT_DOCUMENTS_MAX_PER_ENTRY`, `TEMPORARY_DEV_ADMIN_INVITES` | Feature flags. Keep `TEMPORARY_DEV_ADMIN_INVITES=false` in production. |
 
 **API `.env.testing`.** Copy it from `API/.env.testing.example` for local test runs; it needs a `casamonarca_api_test` MySQL database.
@@ -162,7 +187,10 @@ These have to be created or copied by hand. Secret values are never written here
 
 **Key files and credentials (outside the repo, never commit):**
 
-- **Registry KEK files.** `<kek_id>.key` in `REGISTRY_KEY_DIRECTORY`, mode 600, plus their offline backup or Shamir shares. None exist yet. **Losing a KEK destroys the data it protects.**
+- **Registry private keys.** These exist only for the local demo so far.
+  - The domain private keys (`pk_*.age`, encrypted for the admin's YubiKey) live on the admin's computer and an offline backup.
+  - Each coordinator or admin holds a personal key file plus its passphrase.
+  - **Losing every copy of a domain private key destroys the data it protects.**
 - **Database backups.** `age` keys for `API/scripts/backup-database-encrypted.sh`:
   - `DB_BACKUP_AGE_RECIPIENT` is the public key and goes on the server.
   - The matching private identity is kept offline and is needed to restore.
@@ -183,4 +211,8 @@ These have to be created or copied by hand. Secret values are never written here
 
 ### Local tooling notes
 
-The previous Windows machine had no `gh`, `node`, `python`, `php`, `composer` or `docker`. The GitHub API was used through `curl` and PowerShell, and CI was the only way to run tests. Install PHP 8.3, Composer 2, Node 24, npm 11 and Docker on the new machine to work locally.
+The current Windows machine has PHP 8.3.36, Composer 2, Node 24, npm, MySQL 8.0 (local, non-Docker), Docker Desktop and `gh`. Notes:
+
+- API tests need `OPENSSL_CONF=<PHP dir>\extras\ssl\openssl.cnf`, or the tests that generate RSA keys fail.
+- `API/.env.testing` points at `casamonarca_api_test`, so `RefreshDatabase` never wipes the dev database.
+- Non-Docker dev servers run through a local `.claude/launch.json` (`api` on :8000, `web` on :5173). It is not committed.

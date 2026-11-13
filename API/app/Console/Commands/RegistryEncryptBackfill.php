@@ -16,35 +16,33 @@ class RegistryEncryptBackfill extends Command
         {--batch=100 : Rows per batch}
         {--dry-run : Count rows that need encryption without writing}
         {--purge-plaintext : After verifying, replace plaintext columns with placeholders (irreversible without a backup)}
-        {--private-dir= : publickey mode: directory with the domain private keys, needed for the decrypt-and-compare check}
-        {--age-identity= : publickey mode: age identity file to open .age private keys}';
+        {--private-dir= : directory with the domain private keys, needed for the decrypt-and-compare check}
+        {--age-identity= : age identity file to open .age private keys}';
 
     protected $description = 'Resumable backfill of registration and ARCO payloads into authenticated envelopes, with decrypt-and-compare verification';
 
     public function handle(): int
     {
         if (! config('registry_encryption.enabled')) {
-            $this->error('Set REGISTRY_ENCRYPTION_ENABLED=true (with a provisioned KEK) before running the backfill.');
+            $this->error('Set REGISTRY_ENCRYPTION_ENABLED=true (with REGISTRY_PK_*_PUBLIC configured) before running the backfill.');
 
             return self::FAILURE;
         }
 
         $purge = (bool) $this->option('purge-plaintext');
 
-        if (config('registry_encryption.mode') === 'publickey') {
-            if ((string) $this->option('private-dir') === '') {
-                $this->error('publickey mode needs --private-dir (domain private keys) to verify each row after sealing it.');
+        if ((string) $this->option('private-dir') === '') {
+            $this->error('The backfill needs --private-dir (domain private keys) to verify each row after sealing it.');
 
-                return self::FAILURE;
-            }
+            return self::FAILURE;
+        }
 
-            try {
-                PrivateKeyDirectory::unlockInto(app(KeyRing::class), (string) $this->option('private-dir'), ((string) $this->option('age-identity')) ?: null);
-            } catch (EncryptionException $e) {
-                $this->error($e->getMessage());
+        try {
+            PrivateKeyDirectory::unlockInto(app(KeyRing::class), (string) $this->option('private-dir'), ((string) $this->option('age-identity')) ?: null);
+        } catch (EncryptionException $e) {
+            $this->error($e->getMessage());
 
-                return self::FAILURE;
-            }
+            return self::FAILURE;
         }
 
         if ($purge && ! $this->option('dry-run') && ! $this->confirm('Plaintext will be replaced by placeholders. Confirm a fresh encrypted backup exists and the rollback window has ended.')) {

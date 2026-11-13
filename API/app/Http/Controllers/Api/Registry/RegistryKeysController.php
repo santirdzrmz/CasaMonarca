@@ -30,7 +30,7 @@ class RegistryKeysController extends Controller
     /** The user uploads their key file and passphrase; THEIR grants are opened and kept in their session. */
     public function unlock(Request $request): JsonResponse
     {
-        abort_unless(config('registry_encryption.mode') === 'publickey', 409, 'User keys are not enabled.');
+        abort_unless(config('registry_encryption.enabled'), 409, 'User keys are not enabled.');
 
         $validated = $request->validate([
             'key_file' => ['required', 'string', 'max:4096'],
@@ -96,7 +96,7 @@ class RegistryKeysController extends Controller
         }
 
         return [
-            'mode' => config('registry_encryption.mode'),
+            'mode' => config('registry_encryption.enabled') ? 'publickey' : 'off',
             'enrolled' => DB::table('registry_user_keys')->where('user_id', $userId)->whereNull('revoked_at')->exists(),
             'unlocked' => $domains !== [],
             'unlocked_domains' => array_values(array_unique($domains)),

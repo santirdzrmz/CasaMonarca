@@ -45,6 +45,7 @@ const sample: RegistryStatistics = {
   },
   mexicoToMonterrey: { bins: [], count: 0, inconsistentDates: 0, median: null, missingDates: 0, p25: null, p75: null },
   range: { dateBasis: 'attentionDate', from: null, to: null },
+  requestedServices: { areas: [], areasByMonth: [], label: 'Servicios solicitados', noAnswer: 4, respondents: 0, services: [] },
   total: 4,
 }
 

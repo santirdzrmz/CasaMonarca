@@ -75,7 +75,7 @@ final class RegistryEntryPresenter
      */
     public function presentArco(MigrantArcoRequest $request): mixed
     {
-        if (! $this->enforced() && config('registry_encryption.mode') !== 'publickey') {
+        if (! $this->enforced() && ! config('registry_encryption.enabled')) {
             return $request;
         }
 

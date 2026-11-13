@@ -5,7 +5,9 @@ namespace Tests\Feature\Api\Registry;
 use App\Models\MigrantRegistryEntry;
 use App\Models\User;
 use App\Services\Security\Encryption\EncryptionException;
-use App\Services\Security\Encryption\FileKekProvider;
+use App\Services\Security\Encryption\EnvelopeCipher;
+use App\Services\Security\Encryption\KekProvider;
+use App\Services\Security\Encryption\KeyRing;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -14,35 +16,31 @@ class EncryptedPayloadStorageTest extends TestCase
 {
     use RefreshDatabase;
 
-    private string $directory;
-
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'kek-'.bin2hex(random_bytes(4));
-        mkdir($this->directory, 0700);
-        $path = $this->directory.'/test-kek.key';
-        file_put_contents($path, FileKekProvider::generateKeyMaterial());
-        chmod($path, 0600);
+        $publicKeys = [];
+        $secrets = [];
+
+        foreach (['cand', 'proc'] as $domain) {
+            $pair = sodium_crypto_box_keypair();
+            $publicKeys[$domain] = ['id' => "pk:{$domain}-1", 'public' => base64_encode(sodium_crypto_box_publickey($pair))];
+            $secrets["pk:{$domain}-1"] = sodium_crypto_box_secretkey($pair);
+        }
 
         config([
             'registry_encryption.enabled' => true,
             'registry_encryption.write_plaintext' => false,
-            'registry_encryption.key_directory' => $this->directory,
-            'registry_encryption.active_kek_id' => 'test-kek',
+            'registry_encryption.public_keys' => $publicKeys,
         ]);
-        app()->forgetInstance(\App\Services\Security\Encryption\KekProvider::class);
-        app()->forgetInstance(\App\Services\Security\Encryption\EnvelopeCipher::class);
-    }
+        app()->forgetInstance(KekProvider::class);
+        app()->forgetInstance(EnvelopeCipher::class);
 
-    protected function tearDown(): void
-    {
-        foreach (glob($this->directory.'/*') ?: [] as $file) {
-            unlink($file);
+        // Stand-in for a coordinator who unlocked both domains in this session.
+        foreach ($secrets as $kekId => $secret) {
+            app(KeyRing::class)->unlock($kekId, $secret);
         }
-        rmdir($this->directory);
-        parent::tearDown();
     }
 
     private function entry(array $payload): MigrantRegistryEntry
@@ -64,6 +62,7 @@ class EncryptedPayloadStorageTest extends TestCase
         $raw = DB::table('migrant_registry_entries')->where('id', $entry->id)->first();
         $this->assertStringNotContainsString('María', (string) $raw->payload_json);
         $this->assertStringNotContainsString('María', (string) $raw->payload_json_enc);
+        $this->assertSame('pk:cand-1', json_decode((string) $raw->payload_json_enc, true)['kek']);
         $this->assertSame('María Peña', MigrantRegistryEntry::findOrFail($entry->id)->payload_json['fullName']);
     }
 
@@ -87,6 +86,15 @@ class EncryptedPayloadStorageTest extends TestCase
 
         $this->expectException(EncryptionException::class);
         MigrantRegistryEntry::findOrFail($b->id)->payload_json;
+    }
+
+    public function test_reading_without_unlocked_keys_fails_closed(): void
+    {
+        $entry = $this->entry(['fullName' => 'Locked']);
+        app(KeyRing::class)->lock();
+
+        $this->expectException(EncryptionException::class);
+        MigrantRegistryEntry::findOrFail($entry->id)->payload_json;
     }
 
     public function test_legacy_plaintext_rows_remain_readable_during_dual_read(): void

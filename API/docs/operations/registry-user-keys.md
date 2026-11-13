@@ -1,12 +1,13 @@
 # Llaves por usuario del registro (modelo de llave pública)
 
-Alternativa a la KEK en archivo (`registry-kek-proposals.html`, opciones A a D). Reutiliza el `EnvelopeCipher`: cada
-registro sigue teniendo su DEK AES-256-GCM, y lo único que cambia es **con qué se envuelve la DEK** y **quién puede abrirla**.
-Se activa con `REGISTRY_ENCRYPTION_MODE=publickey`; con `file` (por defecto) la app se comporta como antes.
+**Es el único esquema de llaves del registro** (decisión de 2026-11). Sustituyó a la KEK simétrica en archivo, que se
+eliminó del código junto con `registry:kek-generate` y las propuestas de custodia A a D. Usa el `EnvelopeCipher`: cada
+registro tiene su DEK AES-256-GCM, envuelta con la llave **pública** de su dominio; abrirla requiere la llave **privada**.
+Se activa con `REGISTRY_ENCRYPTION_ENABLED=true` una vez configuradas las llaves públicas; apagado, los datos se guardan en claro.
 
 ## Idea
 
-| | KEK en archivo (hoy) | Llaves por usuario (`publickey`) |
+| | KEK en archivo (eliminada) | Llaves por usuario (actual) |
 |---|---|---|
 | Datos | DEK por registro, AES-256-GCM | Igual |
 | La DEK se envuelve con | Una KEK simétrica en un archivo del servidor | Una llave **pública** por dominio |
@@ -87,7 +88,7 @@ sustituye ese registro sin cambiar el resto.
    desarrollo). Copia al `.env` las llaves **públicas** que imprime.
 2. `php artisan migrate`.
 3. Por cada coordinador/administrador: `registry:keys-enroll`, confirmar la huella y `registry:keys-grant`.
-4. `REGISTRY_ENCRYPTION_MODE=publickey`, `REGISTRY_ENCRYPTION_ENABLED=true`, `REGISTRY_ENCRYPTION_WRITE_PLAINTEXT=true`.
+4. `REGISTRY_ENCRYPTION_ENABLED=true`, `REGISTRY_ENCRYPTION_WRITE_PLAINTEXT=true`.
 5. `registry:encrypt-backfill --dry-run` y luego el real, con `--private-dir` (y `--age-identity`).
 6. Probar: un coordinador desbloquea y lee; un voluntario no; un operador pide acceso, un coordinador lo concede y solo entonces
    lo lee; todo queda en la bitácora.

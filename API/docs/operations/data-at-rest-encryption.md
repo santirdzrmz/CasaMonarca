@@ -21,10 +21,11 @@ verification receipts.
 | Provider snapshots and replicas | Hosting-provider control | Obtain written confirmation that every copy is encrypted |
 | cPanel or provider-managed backups | Hosting-provider control | Verify encryption, key separation, retention, and deletion |
 | Local Docker `db-data` volume | Developer-machine control | Store Docker's data root on an encrypted host disk |
-| Registration and ARCO payloads | Application control | Planned: authenticated envelope encryption before persistence |
+| Registration and ARCO payloads | Application control | Implemented, off by default: envelope encryption with per-user keys (`registry-user-keys.md`); turn on with `REGISTRY_ENCRYPTION_ENABLED` once keys exist |
 | Internal and migrant private files | Application control | Planned: streaming authenticated envelope encryption |
 | Persisted ARCO archives and exports | Application control | Planned: encrypt every persisted artifact; keep transient bundles in memory |
-| Application encryption keys | AWS KMS and application control | Planned: separate registry and file KMS keys; not provisioned yet |
+| Registry keys | Per-user keys | Implemented: public domain keys on the server; private keys held by admins (age/YubiKey) and unlocked per session by coordinators/admins |
+| File encryption keys | AWS KMS and application control | Planned: a file KMS key; not provisioned yet |
 | Recipient-protected ZIP delivery | Application control | Planned: optional AES-256 ZIP in addition to ordinary TLS delivery |
 
 The production environment is shared HostGator/cPanel hosting. The application
@@ -247,9 +248,15 @@ object at rest; entries do not need a second application-encryption layer.
 
 ### Envelope Keys and Separation
 
+> **Decision (2026-11):** registration and ARCO payload DEKs are wrapped with
+> **per-user keys** (X25519 public key per domain `cand`/`proc`, private keys held
+> by people, not by the server). See `registry-user-keys.md`. The symmetric
+> registry KEK file and the `REGISTRY_KEK` KMS key described below were dropped;
+> KMS remains the plan for `FILE_KEK` only.
+
 Use separate symmetric AWS KMS customer-managed keys for these domains:
 
-- `REGISTRY_KEK`: registration and ARCO payload DEKs
+- ~~`REGISTRY_KEK`: registration and ARCO payload DEKs~~ (replaced by per-user keys)
 - `FILE_KEK`: document, supporting-file, and persisted-archive DEKs
 - `SEARCH_INDEX_KEY`: reserve for a future blind-index design; do not provision
   it while decrypt-and-scan remains sufficient
@@ -269,11 +276,9 @@ rewrapping DEKs in a resumable background process. Do not decrypt and re-encrypt
 business content merely to rotate a KEK. Retain recovery access to every key for
 as long as a backup containing dependent ciphertext may be restored.
 
-If AWS KMS cannot be used during the first deployment, the temporary fallback is
-separate environment-specific key files outside the repository and web root,
-owned by the deployment account with mode `600`. This fallback protects a
-database-only disclosure but does not materially isolate keys from compromise of
-the same host and must have a scheduled replacement date.
+The former interim fallback for registry payloads (a symmetric key file on the
+server) was removed in favour of per-user keys, which keep the private keys off
+the server at rest.
 
 ### KMS Access and Decryption Broker
 
@@ -313,9 +318,11 @@ general-purpose encryption keys. PIV-capable YubiKeys could unwrap small DEKs,
 but PIN/touch and physical-presence requirements would prevent unattended
 search, ARCO generation, background work, and reliable multi-user recovery.
 
-A YubiHSM is a separate product and operating model. For these server workflows,
-AWS KMS or a managed HSM is the selected KEK service; staff YubiKeys remain the
-factor that authorizes sensitive operations, not the application's KEK store.
+A YubiHSM is a separate product and operating model. Staff YubiKeys remain the
+WebAuthn factor that authorizes sensitive operations. In the per-user key model
+the administrator's YubiKey also protects the offline `age` copies of the
+registry domain private keys; it is used for key administration
+(`registry:keys-*`), never per request.
 
 ## Protection Boundaries
 
@@ -408,14 +415,15 @@ key store unless a requirement justifies their added cost and operation.
 
 ### Phase 2: Registration Payload Migration
 
-> **Status (2026-10-02):** code scaffolding merged behind
-> `REGISTRY_ENCRYPTION_ENABLED` (default off). Implemented: AES-256-GCM envelope
-> cipher with per-payload DEK and AAD binding (`app/Services/Security/Encryption`),
-> file-based KEK provider (interim, see fallback above), additive `*_enc` columns,
-> dual-read `EncryptedPayload` cast, `registry:kek-generate` and resumable
-> `registry:encrypt-backfill` (verifies by decrypt-and-compare). Not yet done: KMS
-> provider, decrypt-and-scan search parity tests, dropping plaintext, Phase 3 files.
-> Feature tests need a MySQL test schema; run `php artisan test`.
+> **Status (2026-11-13):** merged behind `REGISTRY_ENCRYPTION_ENABLED` (default
+> off). Implemented: AES-256-GCM envelope cipher with per-payload DEK and AAD
+> binding (`app/Services/Security/Encryption`), per-user keys
+> (`PublicKeyKekProvider`, domains `cand`/`proc`, session unlock, signed temporary
+> grants for operators), additive `*_enc` columns, dual-read `EncryptedPayload`
+> cast, `registry:keys-*` commands and resumable `registry:encrypt-backfill`
+> (verifies by decrypt-and-compare with `--private-dir`). Not yet done:
+> decrypt-and-scan search parity tests, dropping plaintext in production, Phase 3
+> files. Rollout steps: `registry-user-keys.md`.
 
 - Add versioned ciphertext/envelope columns without removing plaintext columns.
 - Implement dual reads and controlled dual writes, preferring ciphertext when

@@ -42,7 +42,6 @@ Los datos se crean primero en claro y después se cifran con el backfill, igual 
 
 ```
 REGISTRY_ENCRYPTION_ENABLED=true
-REGISTRY_ENCRYPTION_MODE=publickey
 REGISTRY_ENCRYPTION_WRITE_PLAINTEXT=true
 REGISTRY_PK_CAND_ID=pk:cand-1
 REGISTRY_PK_CAND_PUBLIC=<la que imprimió>

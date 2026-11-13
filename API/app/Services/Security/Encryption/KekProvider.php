@@ -3,8 +3,8 @@
 namespace App\Services\Security\Encryption;
 
 /**
- * Key-encryption-key boundary. The file provider is the interim implementation;
- * an AWS KMS provider can replace it without touching stored envelopes.
+ * Key-encryption-key boundary, implemented by PublicKeyKekProvider (per-user keys).
+ * Another provider (for example AWS KMS) can replace it without touching stored payloads.
  */
 interface KekProvider
 {

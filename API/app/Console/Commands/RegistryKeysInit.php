@@ -15,7 +15,7 @@ class RegistryKeysInit extends Command
         {--plain : SOLO DESARROLLO: guardar las privadas en claro}
         {--generation=1 : Versión de las llaves (pk:cand-N y pk:proc-N)}';
 
-    protected $description = 'Genera los pares de llaves por dominio (candidatos y procesados) para REGISTRY_ENCRYPTION_MODE=publickey';
+    protected $description = 'Genera los pares de llaves por dominio (candidatos y procesados)';
 
     public function handle(): int
     {
@@ -68,7 +68,7 @@ class RegistryKeysInit extends Command
         }
 
         $this->newLine();
-        $this->line('Después activa REGISTRY_ENCRYPTION_MODE=publickey y REGISTRY_ENCRYPTION_ENABLED=true.');
+        $this->line('Después activa REGISTRY_ENCRYPTION_ENABLED=true.');
 
         return self::SUCCESS;
     }

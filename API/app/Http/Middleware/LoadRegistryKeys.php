@@ -15,7 +15,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Loads into the KeyRing the keys the user unlocked in this session, and (for operators) into the DekRing the DEKs of
  * the records they were granted temporary access to. Everything is wiped when the request ends, and every use of a
- * granted key is audited. Does nothing unless REGISTRY_ENCRYPTION_MODE is `publickey`.
+ * granted key is audited. Does nothing unless REGISTRY_ENCRYPTION_ENABLED is true.
  */
 class LoadRegistryKeys
 {
@@ -29,7 +29,7 @@ class LoadRegistryKeys
 
     public function handle(Request $request, Closure $next): Response
     {
-        if (config('registry_encryption.mode') !== 'publickey' || ! $request->hasSession()) {
+        if (! config('registry_encryption.enabled') || ! $request->hasSession()) {
             return $next($request);
         }
 

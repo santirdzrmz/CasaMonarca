@@ -4,41 +4,39 @@ namespace Tests\Unit;
 
 use App\Services\Security\Encryption\EncryptionException;
 use App\Services\Security\Encryption\EnvelopeCipher;
-use App\Services\Security\Encryption\FileKekProvider;
+use App\Services\Security\Encryption\KeyRing;
+use App\Services\Security\Encryption\KeysLockedException;
+use App\Services\Security\Encryption\PublicKeyKekProvider;
 use PHPUnit\Framework\TestCase;
 
 class EnvelopeCipherTest extends TestCase
 {
-    private string $directory;
+    /** @var array<string, array{public: string, secret: string}> keypairs by kek id */
+    private array $pairs = [];
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'kek-'.bin2hex(random_bytes(4));
-        mkdir($this->directory, 0700);
-        $this->writeKey('kek-a');
-        $this->writeKey('kek-b');
-    }
 
-    protected function tearDown(): void
-    {
-        foreach (glob($this->directory.'/*') ?: [] as $file) {
-            unlink($file);
+        foreach (['pk:cand-1', 'pk:cand-2'] as $id) {
+            $pair = sodium_crypto_box_keypair();
+            $this->pairs[$id] = ['public' => sodium_crypto_box_publickey($pair), 'secret' => sodium_crypto_box_secretkey($pair)];
         }
-        rmdir($this->directory);
-        parent::tearDown();
     }
 
-    private function writeKey(string $id): void
+    /** A cipher whose active (writing) key is $active and whose session has $unlocked private keys. */
+    private function cipher(string $active = 'pk:cand-1', string $env = 'testing', ?array $unlocked = null): EnvelopeCipher
     {
-        $path = $this->directory.'/'.$id.'.key';
-        file_put_contents($path, FileKekProvider::generateKeyMaterial());
-        chmod($path, 0600);
-    }
+        $ring = new KeyRing;
 
-    private function cipher(string $active = 'kek-a', string $env = 'testing'): EnvelopeCipher
-    {
-        return new EnvelopeCipher(new FileKekProvider($this->directory, $active), $env);
+        foreach ($unlocked ?? array_keys($this->pairs) as $id) {
+            $ring->unlock($id, $this->pairs[$id]['secret']);
+        }
+
+        return new EnvelopeCipher(
+            new PublicKeyKekProvider(['cand' => ['id' => $active, 'public' => $this->pairs[$active]['public']]], $ring),
+            $env,
+        );
     }
 
     public function test_round_trip_preserves_unicode_payload(): void
@@ -72,7 +70,7 @@ class EnvelopeCipherTest extends TestCase
         }
 
         $this->expectException(EncryptionException::class);
-        $this->cipher('kek-a', 'production')->decrypt($envelope, 't', 1, 'p');
+        $this->cipher('pk:cand-1', 'production')->decrypt($envelope, 't', 1, 'p');
     }
 
     public function test_tampering_fails_closed(): void
@@ -101,20 +99,19 @@ class EnvelopeCipherTest extends TestCase
         }
     }
 
-    public function test_old_envelopes_stay_readable_after_active_kek_changes(): void
+    public function test_old_envelopes_stay_readable_after_the_active_key_generation_changes(): void
     {
-        $envelope = $this->cipher('kek-a')->encrypt(['x' => 1], 't', 1, 'p');
+        $envelope = $this->cipher('pk:cand-1')->encrypt(['x' => 1], 't', 1, 'p');
 
-        $this->assertSame(['x' => 1], $this->cipher('kek-b')->decrypt($envelope, 't', 1, 'p'));
-        $this->assertSame('kek-b', json_decode($this->cipher('kek-b')->encrypt([], 't', 1, 'p'), true)['kek']);
+        $this->assertSame(['x' => 1], $this->cipher('pk:cand-2')->decrypt($envelope, 't', 1, 'p'));
+        $this->assertSame('pk:cand-2', json_decode($this->cipher('pk:cand-2')->encrypt([], 't', 1, 'p'), true)['kek']);
     }
 
-    public function test_missing_key_never_falls_back_to_plaintext(): void
+    public function test_missing_private_key_never_falls_back_to_plaintext(): void
     {
         $envelope = $this->cipher()->encrypt(['x' => 1], 't', 1, 'p');
-        unlink($this->directory.'/kek-a.key');
 
-        $this->expectException(EncryptionException::class);
-        $this->cipher()->decrypt($envelope, 't', 1, 'p');
+        $this->expectException(KeysLockedException::class);
+        $this->cipher(unlocked: [])->decrypt($envelope, 't', 1, 'p');
     }
 }

@@ -34,13 +34,13 @@ describe('KeyStatusBar', () => {
     expect(onLocked).toHaveBeenCalledTimes(1)
   })
 
-  it('renders nothing when keys are locked, the mode is not publickey or the request fails', async () => {
+  it('renders nothing when keys are locked, encryption is off or the request fails', async () => {
     vi.mocked(keys.getRegistryKeyState).mockResolvedValueOnce({ ...unlocked, unlocked: false, unlocked_domains: [], unlocked_kek_ids: [] })
     const { container, rerender } = render(<KeyStatusBar onLocked={vi.fn()} />)
     await vi.waitFor(() => expect(keys.getRegistryKeyState).toHaveBeenCalledTimes(1))
     expect(container).toBeEmptyDOMElement()
 
-    vi.mocked(keys.getRegistryKeyState).mockResolvedValueOnce({ ...unlocked, mode: 'file' })
+    vi.mocked(keys.getRegistryKeyState).mockResolvedValueOnce({ ...unlocked, mode: 'off' })
     rerender(<KeyStatusBar key="file" onLocked={vi.fn()} />)
     await vi.waitFor(() => expect(keys.getRegistryKeyState).toHaveBeenCalledTimes(2))
     expect(container).toBeEmptyDOMElement()

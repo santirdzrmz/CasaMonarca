@@ -4,12 +4,10 @@ namespace Tests\Unit;
 
 use App\Services\Security\Encryption\EncryptionException;
 use App\Services\Security\Encryption\EnvelopeCipher;
-use App\Services\Security\Encryption\FileKekProvider;
 use App\Services\Security\Encryption\KekDomain;
 use App\Services\Security\Encryption\KeyRing;
 use App\Services\Security\Encryption\KeysLockedException;
 use App\Services\Security\Encryption\PublicKeyKekProvider;
-use App\Services\Security\Encryption\RoutingKekProvider;
 use PHPUnit\Framework\TestCase;
 
 class PublicKeyKekProviderTest extends TestCase
@@ -127,22 +125,5 @@ class PublicKeyKekProviderTest extends TestCase
     {
         $this->expectException(EncryptionException::class);
         new PublicKeyKekProvider(['cand' => ['id' => 'pk:proc-1', 'public' => $this->keys['cand']['public']]], new KeyRing);
-    }
-
-    public function test_routing_keeps_legacy_file_envelopes_readable(): void
-    {
-        $dir = sys_get_temp_dir().'/pk-routing-'.bin2hex(random_bytes(4));
-        mkdir($dir, 0700, true);
-        file_put_contents($dir.'/registry-2026-10.key', FileKekProvider::generateKeyMaterial());
-        chmod($dir.'/registry-2026-10.key', 0600);
-
-        $file = new FileKekProvider($dir, 'registry-2026-10');
-        $legacy = (new EnvelopeCipher($file, 'testing'))->encrypt(['a' => 1], self::TYPE, 5, self::PURPOSE);
-        $routing = new EnvelopeCipher(new RoutingKekProvider(new PublicKeyKekProvider($this->keys, new KeyRing), $file), 'testing');
-
-        $this->assertSame(['a' => 1], $routing->decrypt($legacy, self::TYPE, 5, self::PURPOSE));
-
-        unlink($dir.'/registry-2026-10.key');
-        rmdir($dir);
     }
 }

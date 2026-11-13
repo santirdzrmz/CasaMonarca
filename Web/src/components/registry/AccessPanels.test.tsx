@@ -49,7 +49,7 @@ describe('OperatorAccessPanel', () => {
   })
 
   it('renders nothing when user keys are not enabled', async () => {
-    vi.mocked(access.getOperatorAccess).mockResolvedValue({ mode: 'file' })
+    vi.mocked(access.getOperatorAccess).mockResolvedValue({ mode: 'off' })
     const { container } = render(<OperatorAccessPanel />)
     await vi.waitFor(() => expect(access.getOperatorAccess).toHaveBeenCalled())
     expect(container).toBeEmptyDOMElement()

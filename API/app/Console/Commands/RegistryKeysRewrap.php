@@ -24,8 +24,8 @@ class RegistryKeysRewrap extends Command
 
     public function handle(): int
     {
-        if (config('registry_encryption.mode') !== 'publickey' || (string) $this->option('private-dir') === '') {
-            $this->error('Requiere REGISTRY_ENCRYPTION_MODE=publickey y --private-dir.');
+        if (! config('registry_encryption.enabled') || (string) $this->option('private-dir') === '') {
+            $this->error('Requiere REGISTRY_ENCRYPTION_ENABLED=true y --private-dir.');
 
             return self::FAILURE;
         }

@@ -19,8 +19,8 @@ class RegistryAccessController extends Controller
     /** Operator: opens (or reuses) the session key and returns its fingerprint and own requests. */
     public function mine(Request $request): JsonResponse
     {
-        if (config('registry_encryption.mode') !== 'publickey') {
-            return response()->json(['data' => ['mode' => config('registry_encryption.mode')]]);
+        if (! config('registry_encryption.enabled')) {
+            return response()->json(['data' => ['mode' => config('registry_encryption.enabled') ? 'publickey' : 'off']]);
         }
 
         $session = $this->sessions->ensure($request, (int) $request->user()->getKey());
@@ -36,7 +36,7 @@ class RegistryAccessController extends Controller
     /** Operator: asks for temporary access to one record. */
     public function store(Request $request): JsonResponse
     {
-        abort_unless(config('registry_encryption.mode') === 'publickey', 409, 'User keys are not enabled.');
+        abort_unless(config('registry_encryption.enabled'), 409, 'User keys are not enabled.');
 
         $validated = $request->validate([
             'resource' => ['required', 'in:registry,arco'],
