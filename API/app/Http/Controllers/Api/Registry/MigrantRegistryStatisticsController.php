@@ -7,6 +7,7 @@ use App\Services\Registry\MigrantRegistryStatisticsService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class MigrantRegistryStatisticsController extends Controller
 {
@@ -21,6 +22,7 @@ class MigrantRegistryStatisticsController extends Controller
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
             'age_min' => ['nullable', 'integer', 'min:0', 'max:120'],
             'age_max' => ['nullable', 'integer', 'min:0', 'max:120', ...($request->filled('age_min') ? ['gte:age_min'] : [])],
+            'stay' => ['nullable', Rule::in([MigrantRegistryStatisticsService::STAY_IN_SHELTER, MigrantRegistryStatisticsService::STAY_EXITED])],
         ]);
 
         $from = isset($validated['from']) ? CarbonImmutable::createFromFormat('!Y-m-d', $validated['from']) : null;
@@ -32,6 +34,7 @@ class MigrantRegistryStatisticsController extends Controller
                 $to,
                 isset($validated['age_min']) ? (int) $validated['age_min'] : null,
                 isset($validated['age_max']) ? (int) $validated['age_max'] : null,
+                $validated['stay'] ?? null,
             ),
         ]);
     }

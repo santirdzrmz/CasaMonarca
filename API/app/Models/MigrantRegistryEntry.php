@@ -28,9 +28,12 @@ class MigrantRegistryEntry extends Model
         'pending_payload_json',
     ];
 
-    protected $hidden = ['payload_json_enc', 'pending_payload_json_enc'];
+    /** The exit reason is shown only to admins and coordinators (see RegistryEntryPresenter). */
+    protected $hidden = ['payload_json_enc', 'pending_payload_json_enc', 'exit_reason'];
 
     protected $casts = [
+        'exited_at' => 'date:Y-m-d',
+        'exit_reason' => 'encrypted',
         'payload_json' => EncryptedPayload::class.':registration_payload',
         'pending_payload_json' => EncryptedPayload::class.':pending_registration_payload',
     ];
@@ -59,6 +62,16 @@ class MigrantRegistryEntry extends Model
         $kek = json_decode((string) ($this->attributes['payload_json_enc'] ?? ''), true)['kek'] ?? null;
 
         return is_string($kek) && PublicKeyKekProvider::domainOf($kek) === 'proc' ? 'proc' : 'cand';
+    }
+
+    public function hasExited(): bool
+    {
+        return $this->exited_at !== null;
+    }
+
+    public function exitedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'exited_by');
     }
 
     public function signatures(): HasMany

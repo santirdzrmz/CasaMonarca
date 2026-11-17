@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -30,7 +30,9 @@ vi.mock('../../lib/registry', async () => {
   return {
     ...actual,
     getRegistryEntries: vi.fn(),
+    recordRegistryExit: vi.fn(),
     startRegistryPdfDownload: vi.fn(),
+    undoRegistryExit: vi.fn(),
     verifyRegistryPdfDownload: vi.fn(),
   }
 })
@@ -39,6 +41,8 @@ vi.mock('../../lib/webauthn', () => ({ getWebauthnAssertion: vi.fn() }))
 vi.mock('../../lib/securityChallenges', () => ({ cancelSecurityChallenge: vi.fn() }))
 
 const getRegistryEntriesMock = vi.mocked(registry.getRegistryEntries)
+const recordRegistryExitMock = vi.mocked(registry.recordRegistryExit)
+const undoRegistryExitMock = vi.mocked(registry.undoRegistryExit)
 const listMigrantDocumentsMock = vi.mocked(migrantDocuments.listMigrantDocuments)
 const startMigrantDocumentDownloadMock = vi.mocked(migrantDocuments.startMigrantDocumentDownload)
 const verifyMigrantDocumentDownloadMock = vi.mocked(migrantDocuments.verifyMigrantDocumentDownload)
@@ -77,6 +81,8 @@ describe('MigrantRegistrationsPage', () => {
     vi.restoreAllMocks()
     window.sessionStorage.clear()
     getRegistryEntriesMock.mockReset()
+    recordRegistryExitMock.mockReset()
+    undoRegistryExitMock.mockReset()
     listMigrantDocumentsMock.mockReset()
     startMigrantDocumentDownloadMock.mockReset()
     verifyMigrantDocumentDownloadMock.mockReset()
@@ -270,5 +276,69 @@ describe('MigrantRegistrationsPage', () => {
     await waitFor(() => expect(cancelSecurityChallengeMock).toHaveBeenCalledWith('cancelled-registry-pdf-challenge'))
     expect(verifyRegistryPdfDownloadMock).not.toHaveBeenCalled()
     expect(screen.getByText('Se canceló la descarga con llave de acceso.')).toBeInTheDocument()
+  })
+
+  it('filters by shelter stay: in the shelter or already left', async () => {
+    const browserUser = userEvent.setup()
+    getRegistryEntriesMock.mockResolvedValueOnce({
+      data: [
+        {
+          created_at: '2026-07-17T12:00:00Z', created_by: 3, created_by_role: 'volunteer', current_status: 'approved', id: 42,
+          payload_json: { fullName: 'Maria Doe', populationGroup: 'adult' }, updated_at: '2026-07-17T13:00:00Z',
+        },
+        {
+          created_at: '2026-07-10T12:00:00Z', created_by: 3, created_by_role: 'volunteer', current_status: 'approved', exited_at: '2026-07-20', id: 43,
+          payload_json: { fullName: 'Juan Perez', populationGroup: 'adult' }, updated_at: '2026-07-20T13:00:00Z',
+        },
+        {
+          created_at: '2026-07-18T12:00:00Z', created_by: 3, created_by_role: 'volunteer', current_status: 'pending_review', id: 44,
+          payload_json: { fullName: 'Ana Ruiz', populationGroup: 'adult' }, updated_at: '2026-07-18T13:00:00Z',
+        },
+      ],
+    })
+    render(<MigrantRegistrationsPage user={user} />)
+    expect(await screen.findByText('Maria Doe')).toBeInTheDocument()
+
+    await browserUser.click(screen.getByRole('button', { name: 'Egresados' }))
+    expect(screen.getByText('Juan Perez')).toBeInTheDocument()
+    expect(screen.queryByText('Maria Doe')).not.toBeInTheDocument()
+    expect(screen.queryByText('Ana Ruiz')).not.toBeInTheDocument()
+
+    await browserUser.click(screen.getByRole('button', { name: 'En albergue' }))
+    expect(screen.getByText('Maria Doe')).toBeInTheDocument()
+    expect(screen.queryByText('Juan Perez')).not.toBeInTheDocument()
+    expect(screen.queryByText('Ana Ruiz')).not.toBeInTheDocument()
+    // Non-coordinators can filter but not record exits.
+    expect(screen.queryByRole('button', { name: 'Registrar egreso' })).not.toBeInTheDocument()
+  })
+
+  it('lets a coordinator record an exit only after explaining why', async () => {
+    const browserUser = userEvent.setup()
+    const coordinator = { ...user, role: 'coordinator' as const }
+    recordRegistryExitMock.mockResolvedValue({
+      data: {
+        created_at: '2026-07-17T12:00:00Z', created_by: 3, created_by_role: 'volunteer', current_status: 'approved',
+        exit_reason: 'Continuó su viaje.', exited_at: '2026-07-25', exited_by: { id: 7, name: 'Registry Reviewer' }, id: 42,
+        payload_json: { fullName: 'Maria Doe', populationGroup: 'adult' }, updated_at: '2026-07-25T13:00:00Z',
+      },
+      message: 'Shelter exit recorded.',
+    })
+    render(<MigrantRegistrationsPage user={coordinator} />)
+
+    await browserUser.click(await screen.findByRole('button', { name: 'Registrar egreso' }))
+    const dialog = screen.getByRole('dialog', { name: 'Registrar egreso del albergue' })
+    const submit = within(dialog).getByRole('button', { name: 'Registrar egreso' })
+    expect(submit).toBeDisabled()
+
+    await browserUser.clear(within(dialog).getByLabelText('Fecha de egreso'))
+    await browserUser.type(within(dialog).getByLabelText('Fecha de egreso'), '2026-07-25')
+    await browserUser.type(within(dialog).getByLabelText(/¿Por qué salió la persona/), 'Continuó su viaje.')
+    await browserUser.click(submit)
+
+    await waitFor(() => expect(recordRegistryExitMock).toHaveBeenCalledWith(42, '2026-07-25', 'Continuó su viaje.'))
+    expect(await screen.findByText('Egreso registrado para Maria Doe.')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('Continuó su viaje.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Deshacer egreso' })).toBeInTheDocument()
   })
 })

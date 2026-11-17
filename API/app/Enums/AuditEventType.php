@@ -91,6 +91,8 @@ enum AuditEventType: string
     case MigrantRegistryDeleted = 'migrant.registry.deleted';
     case MigrantRegistryPdfDownloadChallengeStarted = 'migrant.registry.pdf.download.challenge.started';
     case MigrantRegistryPdfDownloaded = 'migrant.registry.pdf.downloaded';
+    case MigrantRegistryExitRecorded = 'migrant.registry.exit.recorded';
+    case MigrantRegistryExitUndone = 'migrant.registry.exit.undone';
     case MigrantArcoRequested = 'migrant.arco.requested';
     case MigrantArcoChallengeStarted = 'migrant.arco.challenge.started';
     case MigrantArcoResolved = 'migrant.arco.resolved';

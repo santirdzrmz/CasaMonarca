@@ -27,7 +27,7 @@ class MigrantRegistryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $entries = MigrantRegistryEntry::query()
-            ->with(['creator:id,name,email,role', 'signatures', 'statusHistory'])
+            ->with(['creator:id,name,email,role', 'exitedBy:id,name', 'signatures', 'statusHistory'])
             ->latest()
             ->where('current_status', '!=', MigrantRegistryService::STATUS_DRAFT)
             ->get();

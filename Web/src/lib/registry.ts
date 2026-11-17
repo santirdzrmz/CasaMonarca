@@ -450,4 +450,33 @@ export async function returnRegistryForCorrections(id: number, reason: string) {
   })
 }
 
+export type RegistryExitResponse = {
+  data: RegistryEntry
+  message: string
+}
+
+export async function recordRegistryExit(id: number, exitedAt: string, reason: string) {
+  const { csrfToken } = await getCsrfToken()
+
+  return apiFetch<RegistryExitResponse>(`/registry/migrants/${id}/exit`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': csrfToken,
+    },
+    body: JSON.stringify({ exited_at: exitedAt, reason }),
+  })
+}
+
+export async function undoRegistryExit(id: number) {
+  const { csrfToken } = await getCsrfToken()
+
+  return apiFetch<RegistryExitResponse>(`/registry/migrants/${id}/exit`, {
+    method: 'DELETE',
+    headers: {
+      'X-CSRF-TOKEN': csrfToken,
+    },
+  })
+}
+
 export { ApiRequestError }

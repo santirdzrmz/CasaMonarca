@@ -30,9 +30,23 @@ lectoescritura, tiempo de México a Monterrey, destino final y estado civil, tod
 | México → Monterrey | Q39 Fecha en que ingresó a México → Q1 | Días entre ambas fechas: mediana, rango intercuartil e histograma de 8 intervalos. Se excluyen y se reportan los registros sin alguna de las fechas y los que tienen la atención **antes** del ingreso (dato inconsistente). |
 | Destino final | Q41 | Se quita el punto final de las opciones ("Estados Unidos." → "Estados Unidos"). |
 | Estado civil | Q9 | Por cantidad. |
+| Filtro de edad | "Edad" (`0 - 11 meses` cuenta como 0); si falta, se calcula con la fecha de nacimiento a la fecha de atención | Rango "de – a" (`age_min`, `age_max`, 0–120; cualquiera de los dos puede quedar vacío). Con el filtro activo, los registros sin edad ni fecha de nacimiento quedan fuera y se reportan en `range.ageUnknownExcluded`. |
+| Ingreso / egreso | Columna `exited_at` del registro (no es del cuestionario) | Filtro `stay`: `in_shelter` (aprobados sin egreso) o `exited`. `shelterStay` cuenta en albergue / egresados de quienes llegaron en el periodo (sin aplicar `stay`) y la estancia mediana (días de la atención al egreso). `exitsByMonth` cuenta egresos por el mes en que la persona salió, sin importar cuándo llegó. |
 
 Respuestas vacías cuentan como **"Sin respuesta"**, siempre al final y en gris. Los registros con el formato anterior
 (sin `questionnaire.answers`) se convierten con `upgradeLegacyPayload()` antes de contarse.
+
+### Egresos (registro de salida del albergue)
+
+- Un registro aprobado está **en albergue** hasta que un administrador o coordinador registra su egreso en
+  *Registros actuales* con el botón **Registrar egreso**: una ventana pide la fecha (no futura ni anterior a la fecha
+  de atención) y el **motivo, obligatorio**. **Deshacer egreso** lo revierte si fue un error.
+- API: `POST /registry/migrants/{id}/exit` `{exited_at, reason}` y `DELETE /registry/migrants/{id}/exit`
+  (solo `admin` y `coordinator`; aplica `X-Acting-Department`).
+- El motivo se guarda cifrado con `APP_KEY` (cast `encrypted`) y solo lo reciben administradores y coordinadores.
+  La bitácora registra `migrant.registry.exit.recorded` / `.undone` con la fecha, nunca el texto del motivo.
+- `registry:synthetic` genera egresos para ~85 % de los aprobados (estancia de días a pocas semanas); los que caerían
+  en el futuro siguen en albergue.
 
 ## 3. Diseño
 

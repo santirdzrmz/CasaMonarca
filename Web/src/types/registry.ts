@@ -107,6 +107,11 @@ export type RegistryEntry = {
   creator?: RegistryActor | null
   current_assignee_role?: RegistryRole | null
   current_status: RegistryStatus
+  /** Date the person left the shelter (egreso); null while they are still in it. */
+  exited_at?: string | null
+  /** Why they left. Only admins and coordinators receive it. */
+  exit_reason?: string | null
+  exited_by?: { id: number; name: string } | null
   id: number
   pending_action?: 'create' | 'update' | null
   pending_payload_json?: (Partial<MigrantRegistrationPayload> & Record<string, unknown>) | null

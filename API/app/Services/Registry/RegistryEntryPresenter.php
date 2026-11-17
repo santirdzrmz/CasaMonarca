@@ -33,6 +33,10 @@ final class RegistryEntryPresenter
     /** @param iterable<MigrantRegistryEntry> $entries */
     public function presentMany(iterable $entries, ?User $viewer): iterable
     {
+        foreach ($entries as $entry) {
+            $this->revealExitReason($entry, $viewer);
+        }
+
         if (! $this->enforced()) {
             return $entries;
         }
@@ -49,6 +53,8 @@ final class RegistryEntryPresenter
 
     public function present(MigrantRegistryEntry $entry, ?User $viewer): mixed
     {
+        $this->revealExitReason($entry, $viewer);
+
         if (! $this->enforced() || $viewer === null) {
             return $entry;
         }
@@ -89,6 +95,14 @@ final class RegistryEntryPresenter
             }
 
             return array_merge($request->toArray(), ['payload_locked' => true, 'payload_lock_reason' => 'keys_locked']);
+        }
+    }
+
+    /** Why someone left the shelter is free text; only admins and coordinators read it. */
+    private function revealExitReason(MigrantRegistryEntry $entry, ?User $viewer): void
+    {
+        if ($viewer !== null && in_array($viewer->role?->value, ['admin', 'coordinator'], true)) {
+            $entry->makeVisible('exit_reason');
         }
     }
 

@@ -30,6 +30,11 @@ class MigrantRegistryStatisticsService
 
     public const MISSING = 'Sin respuesta';
 
+    /** Shelter-stay filter values: still in the shelter, or with a recorded exit (egreso). */
+    public const STAY_IN_SHELTER = 'in_shelter';
+
+    public const STAY_EXITED = 'exited';
+
     /**
      * Requested services grouped by the attention area that delivers them. A person
      * counts once per area even when they ask for several services in it.
@@ -94,7 +99,7 @@ class MigrantRegistryStatisticsService
     /**
      * @return array<string, mixed>
      */
-    public function summarize(?CarbonImmutable $from, ?CarbonImmutable $to, ?int $ageMin = null, ?int $ageMax = null): array
+    public function summarize(?CarbonImmutable $from, ?CarbonImmutable $to, ?int $ageMin = null, ?int $ageMax = null, ?string $stay = null): array
     {
         $ageFiltered = $ageMin !== null || $ageMax !== null;
         $ageUnknownExcluded = 0;
@@ -115,6 +120,10 @@ class MigrantRegistryStatisticsService
         $serviceRespondents = 0;
 
         $arrivals = [];
+        $exits = [];
+        $stayDays = [];
+        $inShelter = 0;
+        $exited = 0;
         $days = [];
         $daysMissing = 0;
         $daysInconsistent = 0;
@@ -129,22 +138,50 @@ class MigrantRegistryStatisticsService
             $referenceDate = $this->date($answers[$mapping['attentionDate'] ?? ''] ?? null)
                 ?? ($entry->created_at ? CarbonImmutable::parse($entry->created_at)->startOfDay() : null);
 
-            if ($referenceDate === null || ($from && $referenceDate->lt($from)) || ($to && $referenceDate->gt($to))) {
+            if ($referenceDate === null) {
                 continue;
             }
 
-            if ($ageFiltered) {
-                $age = $this->age($answers, $mapping, $referenceDate);
+            $age = $ageFiltered ? $this->age($answers, $mapping, $referenceDate) : null;
+            $ageMatches = ! $ageFiltered
+                || ($age !== null && ($ageMin === null || $age >= $ageMin) && ($ageMax === null || $age <= $ageMax));
+            $exitDate = $entry->exited_at ? CarbonImmutable::parse($entry->exited_at)->startOfDay() : null;
 
-                if ($age === null) {
-                    $ageUnknownExcluded++;
+            // Exits count by the month the person left, whenever they arrived.
+            if ($exitDate !== null && $ageMatches && $stay !== self::STAY_IN_SHELTER
+                && ! ($from && $exitDate->lt($from)) && ! ($to && $exitDate->gt($to))) {
+                $exitMonth = $exitDate->format('Y-m');
+                $exits[$exitMonth] = ($exits[$exitMonth] ?? 0) + 1;
+                $minMonth = $minMonth === null || $exitMonth < $minMonth ? $exitMonth : $minMonth;
+                $maxMonth = $maxMonth === null || $exitMonth > $maxMonth ? $exitMonth : $maxMonth;
+            }
 
-                    continue;
-                }
+            if (($from && $referenceDate->lt($from)) || ($to && $referenceDate->gt($to))) {
+                continue;
+            }
 
-                if (($ageMin !== null && $age < $ageMin) || ($ageMax !== null && $age > $ageMax)) {
-                    continue;
-                }
+            if ($ageFiltered && $age === null) {
+                $ageUnknownExcluded++;
+
+                continue;
+            }
+
+            if (! $ageMatches) {
+                continue;
+            }
+
+            if ($exitDate === null) {
+                $inShelter++;
+            } else {
+                $exited++;
+            }
+
+            if (($stay === self::STAY_IN_SHELTER && $exitDate !== null) || ($stay === self::STAY_EXITED && $exitDate === null)) {
+                continue;
+            }
+
+            if ($exitDate !== null && $exitDate->gte($referenceDate)) {
+                $stayDays[] = (int) $referenceDate->diffInDays($exitDate);
             }
 
             $total++;
@@ -199,12 +236,18 @@ class MigrantRegistryStatisticsService
                 'ageMax' => $ageMax,
                 // Records left out only because neither age nor birth date was answered.
                 'ageUnknownExcluded' => $ageUnknownExcluded,
+                'stay' => $stay,
             ],
             'total' => $total,
             'arrivalsByMonth' => array_map(
                 fn (string $month): array => ['month' => $month, 'count' => $arrivals[$month] ?? 0],
                 $months,
             ),
+            'exitsByMonth' => array_map(
+                fn (string $month): array => ['month' => $month, 'count' => $exits[$month] ?? 0],
+                $months,
+            ),
+            'shelterStay' => $this->staySummary($stayDays, $inShelter, $exited),
             'dimensions' => collect($dimensions)->map(fn (array $dimension, string $key): array => [
                 'label' => $dimension['label'],
                 'ordered' => $dimension['ordered'],
@@ -378,6 +421,27 @@ class MigrantRegistryStatisticsService
                     fn (int $value): bool => $value >= $bin['min'] && ($bin['max'] === null || $value <= $bin['max']),
                 )),
             ], self::DAY_BINS),
+        ];
+    }
+
+    /**
+     * People who arrived in the period (date and age filters applied, stay filter not), split by whether
+     * they are still in the shelter, plus days from attention to exit for those who left.
+     *
+     * @param  list<int>  $days
+     * @return array<string, mixed>
+     */
+    private function staySummary(array $days, int $inShelter, int $exited): array
+    {
+        sort($days);
+
+        return [
+            'inShelter' => $inShelter,
+            'exited' => $exited,
+            'daysCount' => count($days),
+            'medianDays' => $this->percentile($days, 0.5),
+            'p25Days' => $this->percentile($days, 0.25),
+            'p75Days' => $this->percentile($days, 0.75),
         ];
     }
 

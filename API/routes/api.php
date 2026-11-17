@@ -66,6 +66,7 @@ use App\Http\Controllers\Api\Registry\MigrantRegistryApprovalVerifyController;
 use App\Http\Controllers\Api\Registry\MigrantRegistryBulkApprovalOptionsController;
 use App\Http\Controllers\Api\Registry\MigrantRegistryBulkApprovalVerifyController;
 use App\Http\Controllers\Api\Registry\MigrantRegistryController;
+use App\Http\Controllers\Api\Registry\MigrantRegistryExitController;
 use App\Http\Controllers\Api\Registry\RegistryAccessController;
 use App\Http\Controllers\Api\Registry\RegistryKeysController;
 use App\Http\Controllers\Api\Registry\MigrantRegistryDocumentController;
@@ -232,6 +233,8 @@ Route::middleware('web')->group(function (): void {
             Route::post('/bulk-approval/verify', MigrantRegistryBulkApprovalVerifyController::class);
             Route::post('/{migrantRegistryEntry}/approval/options', MigrantRegistryApprovalOptionsController::class);
             Route::post('/{migrantRegistryEntry}/approval/verify', MigrantRegistryApprovalVerifyController::class);
+            Route::post('/{migrantRegistryEntry}/exit', [MigrantRegistryExitController::class, 'store']);
+            Route::delete('/{migrantRegistryEntry}/exit', [MigrantRegistryExitController::class, 'destroy']);
         });
 
         Route::middleware('requireRole:admin')->withoutMiddleware('requireDepartment')->group(function (): void {

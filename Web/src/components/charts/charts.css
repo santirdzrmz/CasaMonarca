@@ -125,6 +125,20 @@
   background: rgba(19, 35, 58, 0.1);
 }
 
+.viz-filters__hint {
+  font-size: 0.76rem;
+  color: #a2361a;
+}
+
+.viz-filters input[aria-invalid='true'] {
+  border-color: #c2410c;
+}
+
+.viz-tile__divider {
+  color: var(--viz-text-muted);
+  font-weight: 400;
+}
+
 /* Refetch keeps the frame: previous render at reduced opacity, no skeleton. */
 .viz-body {
   display: grid;

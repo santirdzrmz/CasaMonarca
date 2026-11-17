@@ -37,6 +37,15 @@ class RegistrySyntheticData extends Command
         MigrantRegistryService::STATUS_REJECTED => 4,
     ];
 
+    /** Synthetic exit reasons; each is prefixed with the synthetic marker. */
+    private const EXIT_REASONS = [
+        'Continuó su viaje hacia su destino final.',
+        'Salió sin avisar; no regresó al albergue.',
+        'Canalizado a otra institución.',
+        'Consiguió trabajo y vivienda en Monterrey.',
+        'Decidió regresar a su país de origen.',
+    ];
+
     public function handle(SyntheticMigrantRegistryGenerator $generator): int
     {
         if (app()->environment('production')) {
@@ -98,7 +107,7 @@ class RegistrySyntheticData extends Command
                     'pending_requested_by_role' => UserRole::Volunteer->value,
                     'payload_json' => $payload,
                 ]);
-                $entry->forceFill(['created_at' => $createdAt, 'updated_at' => $createdAt])->saveQuietly();
+                $entry->forceFill(['created_at' => $createdAt, 'updated_at' => $createdAt, ...$this->exit($status, $attention, $creator)])->saveQuietly();
 
                 MigrantRegistryStatusHistory::query()->create([
                     'registry_entry_id' => $entry->id,
@@ -201,6 +210,39 @@ class RegistrySyntheticData extends Command
         } while (mt_rand() / mt_getrandmax() > $weight);
 
         return $date;
+    }
+
+    /**
+     * Most approved people leave after days or a few weeks; the ones whose exit date would be in the
+     * future are still in the shelter.
+     *
+     * @return array<string, mixed>
+     */
+    private function exit(string $status, CarbonImmutable $attention, User $creator): array
+    {
+        if ($status !== MigrantRegistryService::STATUS_APPROVED || mt_rand(1, 100) > 85) {
+            return [];
+        }
+
+        $stay = (int) round(exp(1.6 + 0.9 * $this->gaussian()));
+        $exitedAt = $attention->addDays(max(0, min($stay, 120)));
+
+        if ($exitedAt->gt(CarbonImmutable::today())) {
+            return [];
+        }
+
+        return [
+            'exited_at' => $exitedAt->toDateString(),
+            'exit_reason' => SyntheticMigrantRegistryGenerator::MARKER.': '.self::EXIT_REASONS[mt_rand(0, count(self::EXIT_REASONS) - 1)],
+            'exited_by' => $creator->id,
+        ];
+    }
+
+    private function gaussian(): float
+    {
+        $u = max(mt_rand() / mt_getrandmax(), 1e-9);
+
+        return sqrt(-2 * log($u)) * cos(2 * M_PI * (mt_rand() / mt_getrandmax()));
     }
 
     private function status(): string

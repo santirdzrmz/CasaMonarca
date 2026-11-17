@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { MigrantDocumentsPanel } from '../../components/registry/MigrantDocumentsPanel'
 import { MigrantQuestionnaireViewer } from '../../components/registry/MigrantQuestionnaireViewer'
+import { ShelterExitDialog } from '../../components/registry/ShelterExitDialog'
 import { AppIcon } from '../../components/ui/AppIcon'
 import { APP_MIGRANT_REGISTRY_PATH } from '../../config/appRoutes'
 import { migrantDocumentsEnabled } from '../../config/env'
@@ -24,6 +25,8 @@ type MigrantRegistrationsPageProps = {
   user: AuthenticatedUser
 }
 
+type StayFilter = '' | 'in_shelter' | 'exited'
+
 type RegistrationsFilterState = {
   country: string
   page: number
@@ -31,7 +34,20 @@ type RegistrationsFilterState = {
   populationGroup: string
   search: string
   status: string
+  stay: StayFilter
 }
+
+const STAY_OPTIONS: { label: () => string; value: StayFilter }[] = [
+  { label: () => t('All', 'Todos'), value: '' },
+  { label: () => t('In the shelter', 'En albergue'), value: 'in_shelter' },
+  { label: () => t('Left the shelter', 'Egresados'), value: 'exited' },
+]
+
+/** Only approved registrations are in the shelter; they stay there until an exit is recorded. */
+const matchesStay = (entry: RegistryEntry, stay: StayFilter) =>
+  stay === ''
+  || (stay === 'exited' && Boolean(entry.exited_at))
+  || (stay === 'in_shelter' && entry.current_status === 'approved' && !entry.exited_at)
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 const REGISTRATIONS_FILTER_SESSION_KEY = 'casa-monarca.migrant-registrations.filters'
@@ -43,6 +59,7 @@ const DEFAULT_FILTERS: RegistrationsFilterState = {
   populationGroup: '',
   search: '',
   status: '',
+  stay: '',
 }
 
 const getEntryName = (entry: RegistryEntry) =>
@@ -112,6 +129,7 @@ const readStoredFilters = (): RegistrationsFilterState => {
       populationGroup: normalizeFilterValue(stored.populationGroup),
       search: normalizeFilterValue(stored.search),
       status: normalizeFilterValue(stored.status),
+      stay: stored.stay === 'in_shelter' || stored.stay === 'exited' ? stored.stay : '',
     }
   } catch {
     return DEFAULT_FILTERS
@@ -138,6 +156,11 @@ export function MigrantRegistrationsPage({ onNavigate, onSessionExpired, user }:
   const [countryFilter, setCountryFilter] = useState(initialFilters.country)
   const [populationGroupFilter, setPopulationGroupFilter] = useState(initialFilters.populationGroup)
   const [statusFilter, setStatusFilter] = useState(initialFilters.status)
+  const [stayFilter, setStayFilter] = useState<StayFilter>(initialFilters.stay)
+  const [exitDialog, setExitDialog] = useState<{ entry: RegistryEntry; mode: 'record' | 'undo' } | null>(null)
+  // Page-level, so it stays visible when the entry leaves the current stay filter.
+  const [exitNotice, setExitNotice] = useState<string | null>(null)
+  const canManageExits = user.role === 'admin' || user.role === 'coordinator'
   const [page, setPage] = useState(initialFilters.page)
   const [pageSize, setPageSize] = useState(initialFilters.pageSize)
   const [searchInput, setSearchInput] = useState(initialFilters.search)
@@ -201,8 +224,9 @@ export function MigrantRegistrationsPage({ onNavigate, onSessionExpired, user }:
       populationGroup: populationGroupFilter,
       search: debouncedSearch,
       status: statusFilter,
+      stay: stayFilter,
     })
-  }, [countryFilter, debouncedSearch, page, pageSize, populationGroupFilter, statusFilter])
+  }, [countryFilter, debouncedSearch, page, pageSize, populationGroupFilter, statusFilter, stayFilter])
 
   const countries = useMemo(() => getUniqueValues(entries, getEntryCountry), [entries])
   const populationGroups = useMemo(
@@ -218,11 +242,12 @@ export function MigrantRegistrationsPage({ onNavigate, onSessionExpired, user }:
 
     return entries.filter((entry) =>
       (statusFilter === '' || entry.current_status === statusFilter) &&
+      matchesStay(entry, stayFilter) &&
       (countryFilter === '' || getEntryCountry(entry) === countryFilter) &&
       (populationGroupFilter === '' || getEntryPopulationGroupCode(entry) === populationGroupFilter) &&
       (searchTerm === '' || getSearchableValue(entry).includes(searchTerm)),
     )
-  }, [countryFilter, debouncedSearch, entries, populationGroupFilter, statusFilter])
+  }, [countryFilter, debouncedSearch, entries, populationGroupFilter, statusFilter, stayFilter])
 
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -230,7 +255,7 @@ export function MigrantRegistrationsPage({ onNavigate, onSessionExpired, user }:
   const lastVisibleRegistration = Math.min(currentPage * pageSize, filteredEntries.length)
   const visibleEntries = filteredEntries.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const hasActiveFilters = Boolean(
-    countryFilter || populationGroupFilter || statusFilter || debouncedSearch,
+    countryFilter || populationGroupFilter || statusFilter || stayFilter || debouncedSearch,
   )
 
   const refresh = () => {
@@ -243,9 +268,20 @@ export function MigrantRegistrationsPage({ onNavigate, onSessionExpired, user }:
     setCountryFilter('')
     setPopulationGroupFilter('')
     setStatusFilter('')
+    setStayFilter('')
     setSearchInput('')
     setDebouncedSearch('')
     setPage(1)
+  }
+
+  const saveExit = (saved: RegistryEntry) => {
+    const mode = exitDialog?.mode
+    setEntries((current) => current.map((entry) => (entry.id === saved.id ? { ...entry, ...saved } : entry)))
+    const name = getEntryName(saved)
+    setExitNotice(mode === 'undo'
+      ? t(`Exit undone: ${name} shows as in the shelter again.`, `Egreso deshecho: ${name} vuelve a aparecer en el albergue.`)
+      : t(`Shelter exit recorded for ${name}.`, `Egreso registrado para ${name}.`))
+    setExitDialog(null)
   }
 
   const revealDocuments = (entryId: number) => {
@@ -387,6 +423,25 @@ export function MigrantRegistrationsPage({ onNavigate, onSessionExpired, user }:
             {t("Clear filters ", "Limpiar filtros ")}</button>
         </div>
 
+        <div className="registry-stay-filter">
+          <span id="registry-stay-filter-label">{t('Shelter stay', 'Ingreso / egreso')}</span>
+          <div aria-labelledby="registry-stay-filter-label" className="registry-stay-filter__options" role="group">
+            {STAY_OPTIONS.map((option) => (
+              <button
+                aria-pressed={stayFilter === option.value}
+                key={option.value || 'all'}
+                onClick={() => {
+                  setStayFilter(option.value)
+                  setPage(1)
+                }}
+                type="button"
+              >
+                {option.label()}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <label className="registry-browser__population-filter audit-control">
           <span>{t("Population group", "Grupo poblacional")}</span>
           <select
@@ -417,6 +472,7 @@ export function MigrantRegistrationsPage({ onNavigate, onSessionExpired, user }:
           </div>
         </div>
 
+        {exitNotice ? <div className="login-feedback login-feedback--success" role="status">{exitNotice}</div> : null}
         {error ? <div className="login-feedback login-feedback--error">{error}</div> : null}
         {isLoading ? <p className="workspace-panel__copy">{t("Loading current registrations...", "Cargando registros actuales...")}</p> : null}
         {!isLoading && !error && visibleEntries.length === 0 ? (
@@ -438,8 +494,35 @@ export function MigrantRegistrationsPage({ onNavigate, onSessionExpired, user }:
                 <div className="audit-card__badges">
                   <span className="registry-browser__badge">{getEntryPopulationGroup(entry)}</span>
                   <span className="registry-browser__status">{formatRegistryValue(entry.current_status, t('Unknown status', 'Estado desconocido'))}</span>
+                  {entry.exited_at ? (
+                    <span className="registry-browser__stay registry-browser__stay--out">{t('Left ', 'Egresó ')}{formatRegistryDate(entry.exited_at)}</span>
+                  ) : entry.current_status === 'approved' ? (
+                    <span className="registry-browser__stay registry-browser__stay--in">{t('In the shelter', 'En albergue')}</span>
+                  ) : null}
                 </div>
               </div>
+
+              {canManageExits && entry.current_status === 'approved' ? (
+                <div className="registry-browser__actions">
+                  <button
+                    className="session-action session-action--quiet session-action--inline"
+                    onClick={() => setExitDialog({ entry, mode: entry.exited_at ? 'undo' : 'record' })}
+                    type="button"
+                  >
+                    <AppIcon name={entry.exited_at ? 'refresh' : 'logout'} />
+                    {entry.exited_at ? t('Undo exit', 'Deshacer egreso') : t('Record exit', 'Registrar egreso')}
+                  </button>
+                </div>
+              ) : null}
+              {entry.exited_at && entry.exit_reason ? (
+                <p className="registry-browser__exit-reason">
+                  <small>
+                    {t('Exit reason', 'Motivo de egreso')}
+                    {entry.exited_by?.name ? ` · ${entry.exited_by.name}` : ''}
+                  </small>
+                  {entry.exit_reason}
+                </p>
+              ) : null}
 
               {user.role === 'non_coordinator' && entry.current_status === 'approved' ? (
                 <div className="registry-browser__actions">
@@ -518,6 +601,17 @@ export function MigrantRegistrationsPage({ onNavigate, onSessionExpired, user }:
             </article>
           ))}
         </section>
+      ) : null}
+
+      {exitDialog ? (
+        <ShelterExitDialog
+          entry={exitDialog.entry}
+          entryName={getEntryName(exitDialog.entry)}
+          mode={exitDialog.mode}
+          onClose={() => setExitDialog(null)}
+          onSaved={saveExit}
+          onSessionExpired={onSessionExpired}
+        />
       ) : null}
     </section>
   )

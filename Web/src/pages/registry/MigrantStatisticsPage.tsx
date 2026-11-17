@@ -15,6 +15,7 @@ import {
   MISSING_ANSWER,
   type AgeRange,
   type RegistryStatistics,
+  type ShelterStay,
   type StatisticsCategory,
   type StatisticsDimension,
   type StatisticsDimensionKey,
@@ -52,13 +53,34 @@ const parseAge = (value: string): number | null => {
   return Number.isInteger(age) && age >= 0 && age <= MAX_AGE ? age : null
 }
 
-const describeAge = ({ min }: AgeRange): string | null => {
-  if (min === null) {
+const years = (age: number) => (age === 1 ? t('1 year', '1 año') : t(`${age} years`, `${age} años`))
+
+const describeAge = ({ max, min }: AgeRange): string | null => {
+  if (min === null && max === null) {
     return null
   }
 
-  return min === 1 ? t('aged 1', 'de 1 año') : t(`aged ${min}`, `de ${min} años`)
+  if (min !== null && max !== null) {
+    return min === max
+      ? t(`aged ${years(min)}`, `de ${years(min)}`)
+      : t(`aged ${min} to ${years(max)}`, `de ${min} a ${years(max)}`)
+  }
+
+  return min !== null
+    ? t(`aged ${years(min)} or older`, `de ${years(min)} o más`)
+    : t(`aged up to ${years(max ?? 0)}`, `de hasta ${years(max ?? 0)}`)
 }
+
+const STAY_OPTIONS: { id: ShelterStay | null; label: string }[] = [
+  { id: null, label: t('Everyone', 'Todos') },
+  { id: 'in_shelter', label: t('In the shelter', 'En albergue') },
+  { id: 'exited', label: t('Left the shelter', 'Egresados') },
+]
+
+const describeStay = (stay: ShelterStay | null): string | null =>
+  stay === 'in_shelter'
+    ? t('still in the shelter', 'que siguen en el albergue')
+    : stay === 'exited' ? t('who already left', 'que ya egresaron') : null
 
 const isoDate = (date: Date) => {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
@@ -137,7 +159,8 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
   const [range, setRange] = useState<Range>(() => presetRange('last365'))
   const [customRange, setCustomRange] = useState<Range>(() => presetRange('last90'))
   const [ageRange, setAgeRange] = useState<AgeRange>(ALL_AGES)
-  const [ageInput, setAgeInput] = useState('')
+  const [ageInput, setAgeInput] = useState({ max: '', min: '' })
+  const [stay, setStay] = useState<ShelterStay | null>(null)
   const [stackKey, setStackKey] = useState<StatisticsDimensionKey>('gender')
   const [data, setData] = useState<RegistryStatistics | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -148,7 +171,7 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
   useEffect(() => {
     let active = true
 
-    getRegistryStatistics(range, ageRange)
+    getRegistryStatistics(range, ageRange, stay)
       .then((response) => {
         if (active) {
           setData(response)
@@ -185,7 +208,7 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
     return () => {
       active = false
     }
-  }, [ageRange, onSessionExpired, range, reloadCount])
+  }, [ageRange, onSessionExpired, range, reloadCount, stay])
 
   const changeRange = (next: Range) => {
     setLoading(true)
@@ -205,18 +228,34 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
     }
   }
 
-  // One exact age: the API is asked for that age as both ends of its range.
-  const updateAge = (value: string) => {
-    setAgeInput(value)
-    const age = parseAge(value)
+  // From-to age range; either end can stay empty. The same age in both boxes is one exact age.
+  const updateAge = (next: { max: string; min: string }) => {
+    setAgeInput(next)
+    const min = parseAge(next.min)
+    const max = parseAge(next.max)
 
-    if (value.trim() !== '' && age === null) {
+    if ((next.min.trim() !== '' && min === null) || (next.max.trim() !== '' && max === null)) {
       return
     }
 
-    if (age !== ageRange.min) {
+    if (min !== null && max !== null && min > max) {
+      return
+    }
+
+    if (min !== ageRange.min || max !== ageRange.max) {
       setLoading(true)
-      setAgeRange(age === null ? ALL_AGES : { max: age, min: age })
+      setAgeRange({ max, min })
+    }
+  }
+
+  const ageMinValue = parseAge(ageInput.min)
+  const ageMaxValue = parseAge(ageInput.max)
+  const ageInverted = ageMinValue !== null && ageMaxValue !== null && ageMinValue > ageMaxValue
+
+  const selectStay = (next: ShelterStay | null) => {
+    if (next !== stay) {
+      setLoading(true)
+      setStay(next)
     }
   }
 
@@ -277,7 +316,19 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
   const services = data.requestedServices
   const serviceRows = toRows(services.services)
   const ageLabel = describeAge(ageRange)
+  const stayLabel = describeStay(stay)
   const ageUnknown = data.range.ageUnknownExcluded ?? 0
+  const scope = [ageLabel, stayLabel].filter(Boolean).join(', ')
+  const shelterStay = data.shelterStay ?? null
+  const exitsByMonth = data.exitsByMonth ?? []
+  const totalExits = exitsByMonth.reduce((sum, month) => sum + month.count, 0)
+  const exits = exitsByMonth.map((month) => ({
+    key: month.month,
+    label: formatMonth(month.month),
+    title: formatMonth(month.month, 'long'),
+    values: { count: month.count },
+  }))
+  const arrivalsByMonth = new Map(data.arrivalsByMonth.map((month) => [month.month, month.count]))
 
   const categoryCards: { key: StatisticsDimensionKey; rows: BarListRow[]; subtitle?: string }[] = [
     {
@@ -348,23 +399,58 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
           ) : null}
 
           <div className="viz-filters__group">
-            <label className="viz-filters__label" htmlFor="statistics-age">{t('Age (years)', 'Edad (años)')}</label>
-            <div className="viz-filters__range">
+            <span className="viz-filters__label" id="statistics-age-label">{t('Age (years), from – to', 'Edad (años), de – a')}</span>
+            <div aria-labelledby="statistics-age-label" className="viz-filters__range" role="group">
               <input
-                id="statistics-age"
+                aria-invalid={ageInverted}
+                aria-label={t('Age from', 'Edad desde')}
                 inputMode="numeric"
                 max={MAX_AGE}
                 min={0}
-                onChange={(event) => updateAge(event.target.value)}
-                placeholder={t('All', 'Todas')}
+                onChange={(event) => updateAge({ ...ageInput, min: event.target.value })}
+                placeholder="0"
                 type="number"
-                value={ageInput}
+                value={ageInput.min}
               />
-              {ageInput !== '' ? (
-                <button className="viz-filters__clear" onClick={() => updateAge('')} type="button">
+              <span aria-hidden="true">–</span>
+              <input
+                aria-invalid={ageInverted}
+                aria-label={t('Age to', 'Edad hasta')}
+                inputMode="numeric"
+                max={MAX_AGE}
+                min={0}
+                onChange={(event) => updateAge({ ...ageInput, max: event.target.value })}
+                placeholder={String(MAX_AGE)}
+                type="number"
+                value={ageInput.max}
+              />
+              {ageInput.min !== '' || ageInput.max !== '' ? (
+                <button className="viz-filters__clear" onClick={() => updateAge({ max: '', min: '' })} type="button">
                   {t('All ages', 'Todas las edades')}
                 </button>
               ) : null}
+            </div>
+            {ageInverted ? (
+              <span className="viz-filters__hint" role="alert">
+                {t('"From" must be less than or equal to "to".', 'La edad "de" debe ser menor o igual que la edad "a".')}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="viz-filters__group">
+            <span className="viz-filters__label">{t('Shelter stay', 'Ingreso / egreso')}</span>
+            <div className="viz-presets" role="group" aria-label={t('Shelter stay', 'Ingreso / egreso')}>
+              {STAY_OPTIONS.map((item) => (
+                <button
+                  aria-pressed={stay === item.id}
+                  key={item.id ?? 'all'}
+                  onClick={() => selectStay(item.id)}
+                  type="button"
+                >
+                  {stay === item.id ? <span aria-hidden="true" className="viz-presets__check">✓</span> : null}
+                  {item.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -387,14 +473,30 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
             <p className="viz-tile__label">{t('People who arrived', 'Personas que llegaron')}</p>
             <p className="viz-tile__value viz-tile__value--hero">{formatCount(total)}</p>
             <p className="viz-tile__note">
-              {ageLabel
-                ? t(`Approved registrations in the period, ${ageLabel}.`, `Registros aprobados en el periodo, ${ageLabel}.`)
+              {scope
+                ? t(`Approved registrations in the period, ${scope}.`, `Registros aprobados en el periodo, ${scope}.`)
                 : t('Approved registrations in the period.', 'Registros aprobados en el periodo.')}
               {ageLabel && ageUnknown > 0
                 ? t(` ${formatCount(ageUnknown)} without a recorded age are left out.`, ` ${formatCount(ageUnknown)} sin edad registrada quedan fuera.`)
                 : null}
             </p>
           </div>
+          {shelterStay ? (
+            <div className="viz-tile">
+              <p className="viz-tile__label">{t('In the shelter / left', 'En albergue / egresados')}</p>
+              <p className="viz-tile__value">
+                {formatCount(shelterStay.inShelter)} <span className="viz-tile__divider">/</span> {formatCount(shelterStay.exited)}
+              </p>
+              <p className="viz-tile__note">
+                {shelterStay.medianDays === null
+                  ? t('Of those who arrived in the period. No recorded exits yet.', 'De quienes llegaron en el periodo. Aún no hay egresos registrados.')
+                  : t(
+                    `Of those who arrived in the period. Median stay ${formatCount(shelterStay.medianDays)} days (half between ${formatCount(shelterStay.p25Days ?? 0)} and ${formatCount(shelterStay.p75Days ?? 0)}).`,
+                    `De quienes llegaron en el periodo. Estancia mediana de ${formatCount(shelterStay.medianDays)} días (la mitad entre ${formatCount(shelterStay.p25Days ?? 0)} y ${formatCount(shelterStay.p75Days ?? 0)}).`,
+                  )}
+              </p>
+            </div>
+          ) : null}
           <div className="viz-tile">
             <p className="viz-tile__label">{t('Median days from entering Mexico to Monterrey', 'Mediana de días de México a Monterrey')}</p>
             <p className="viz-tile__value">
@@ -452,6 +554,34 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
                 rows={data.arrivalsByMonth.map((month) => [formatMonth(month.month, 'long'), formatCount(month.count)])}
               />
             </section>
+
+            {stay !== 'in_shelter' ? (
+              <section className="workspace-panel viz-card">
+                <div>
+                  <h2 className="viz-card__title">{t('Exits per month', 'Egresos por mes')}</h2>
+                  <p className="viz-card__subtitle">
+                    {t(
+                      `By the date the person left the shelter, whenever they arrived · ${formatCount(totalExits)} exits in the period.`,
+                      `Según la fecha en que la persona salió del albergue, sin importar cuándo llegó · ${formatCount(totalExits)} egresos en el periodo.`,
+                    )}
+                  </p>
+                </div>
+                <ColumnChart
+                  ariaLabel={t('Exits per month', 'Egresos por mes')}
+                  data={exits}
+                  series={[{ color: 'var(--viz-series-2)', key: 'count', label: t('exits', 'egresos') }]}
+                />
+                <DataTable
+                  caption={t('Arrivals and exits per month', 'Ingresos y egresos por mes')}
+                  columns={[t('Month', 'Mes'), t('Arrivals', 'Ingresos'), t('Exits', 'Egresos')]}
+                  rows={exitsByMonth.map((month) => [
+                    formatMonth(month.month, 'long'),
+                    formatCount(arrivalsByMonth.get(month.month) ?? 0),
+                    formatCount(month.count),
+                  ])}
+                />
+              </section>
+            ) : null}
 
             <section className="workspace-panel viz-card">
               <div>

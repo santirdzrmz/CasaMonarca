@@ -181,6 +181,31 @@ class MigrantRegistryStatisticsApiTest extends TestCase
             ->assertJsonValidationErrors('age_max');
     }
 
+    public function test_stay_filter_splits_people_in_the_shelter_from_those_who_left(): void
+    {
+        $this->entry(['attention' => '2026-03-01']); // still in the shelter
+        $this->entry(['attention' => '2026-03-02'])->forceFill(['exited_at' => '2026-03-12'])->save(); // 10 days
+        $this->entry(['attention' => '2026-03-03'])->forceFill(['exited_at' => '2026-04-02'])->save(); // 30 days
+        $this->entry(['attention' => '2026-01-20'])->forceFill(['exited_at' => '2026-03-05'])->save(); // arrived before the period
+
+        $admin = $this->enrolled(UserRole::Admin);
+        $march = self::URL.'?from=2026-03-01&to=2026-03-31';
+
+        $data = $this->actingAs($admin)->getJson($march)->assertOk()->json('data');
+        $this->assertSame(3, $data['total']);
+        $this->assertEquals(['inShelter' => 1, 'exited' => 2, 'daysCount' => 2, 'medianDays' => 20, 'p25Days' => 15, 'p75Days' => 25], $data['shelterStay']);
+        // Exits count in the month the person left, whenever they arrived.
+        $this->assertSame([['month' => '2026-03', 'count' => 2]], $data['exitsByMonth']);
+
+        $this->actingAs($admin)->getJson($march.'&stay=in_shelter')
+            ->assertJsonPath('data.total', 1)
+            ->assertJsonPath('data.range.stay', 'in_shelter')
+            ->assertJsonPath('data.exitsByMonth', [['month' => '2026-03', 'count' => 0]]);
+
+        $this->actingAs($admin)->getJson($march.'&stay=exited')->assertJsonPath('data.total', 2);
+        $this->actingAs($admin)->getJson($march.'&stay=gone')->assertStatus(422)->assertJsonValidationErrors('stay');
+    }
+
     public function test_invalid_ranges_are_rejected(): void
     {
         $this->actingAs($this->enrolled(UserRole::Admin))

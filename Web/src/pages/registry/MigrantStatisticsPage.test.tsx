@@ -52,7 +52,9 @@ const sample: RegistryStatistics = {
     p25: 5,
     p75: 12,
   },
+  exitsByMonth: [{ count: 1, month: '2026-02' }, { count: 3, month: '2026-03' }],
   range: { dateBasis: 'attentionDate', from: null, to: null },
+  shelterStay: { daysCount: 4, exited: 4, inShelter: 6, medianDays: 12, p25Days: 6, p75Days: 20 },
   requestedServices: {
     areas: [
       { count: 4, key: 'humanitarian', label: 'Humanitaria', services: ['Ropa y Calzado'] },
@@ -117,18 +119,19 @@ describe('MigrantStatisticsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Todo' }))
 
     await waitFor(() => {
-      expect(statistics.getRegistryStatistics).toHaveBeenLastCalledWith({ from: null, to: null }, { max: null, min: null })
+      expect(statistics.getRegistryStatistics).toHaveBeenLastCalledWith({ from: null, to: null }, { max: null, min: null }, null)
     })
   })
 
-  it('filters by one exact age and can go back to all ages', async () => {
+  it('filters by an age range and can go back to all ages', async () => {
     render(<MigrantStatisticsPage user={user} />)
     await screen.findByRole('heading', { name: 'Llegadas por mes' })
 
-    await userEvent.type(screen.getByLabelText('Edad (años)'), '25')
+    await userEvent.type(screen.getByLabelText('Edad desde'), '18')
+    await userEvent.type(screen.getByLabelText('Edad hasta'), '59')
 
     await waitFor(() => {
-      expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[1]).toEqual({ max: 25, min: 25 })
+      expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[1]).toEqual({ max: 59, min: 18 })
     })
 
     await userEvent.click(screen.getByRole('button', { name: 'Todas las edades' }))
@@ -136,6 +139,21 @@ describe('MigrantStatisticsPage', () => {
     await waitFor(() => {
       expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[1]).toEqual({ max: null, min: null })
     })
+  })
+
+  it('does not query an inverted age range', async () => {
+    render(<MigrantStatisticsPage user={user} />)
+    await screen.findByRole('heading', { name: 'Llegadas por mes' })
+
+    await userEvent.type(screen.getByLabelText('Edad desde'), '40')
+    await waitFor(() => {
+      expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[1]).toEqual({ max: null, min: 40 })
+    })
+    await userEvent.type(screen.getByLabelText('Edad hasta'), '20')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('menor o igual')
+    // Typing "2" then "20" both stay below 40, so the API is never asked for them.
+    expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[1]).toEqual({ max: null, min: 40 })
   })
 
   it('says how many records without an age the filter leaves out', async () => {
@@ -146,8 +164,29 @@ describe('MigrantStatisticsPage', () => {
     render(<MigrantStatisticsPage user={user} />)
     await screen.findByRole('heading', { name: 'Llegadas por mes' })
 
-    await userEvent.type(screen.getByLabelText('Edad (años)'), '30')
+    await userEvent.type(screen.getByLabelText('Edad desde'), '30')
+    await userEvent.type(screen.getByLabelText('Edad hasta'), '30')
 
     expect(await screen.findByText(/de 30 años\. 3 sin edad registrada quedan fuera\./)).toBeInTheDocument()
+  })
+
+  it('filters by shelter stay and shows exits per month', async () => {
+    render(<MigrantStatisticsPage user={user} />)
+
+    expect(await screen.findByRole('heading', { name: 'Egresos por mes' })).toBeInTheDocument()
+    const summary = within(screen.getByRole('region', { name: 'Resumen' }))
+    expect(summary.getByText('En albergue / egresados')).toBeInTheDocument()
+    expect(summary.getByText(/Estancia mediana de 12 días/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Egresados' }))
+    await waitFor(() => {
+      expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[2]).toBe('exited')
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'En albergue' }))
+    await waitFor(() => {
+      expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[2]).toBe('in_shelter')
+    })
+    expect(screen.queryByRole('heading', { name: 'Egresos por mes' })).not.toBeInTheDocument()
   })
 })

@@ -45,8 +45,22 @@ export type RequestedServices = {
   services: StatisticsCategory[]
 }
 
+/** Shelter stay: still in the shelter, or with a recorded exit (egreso). */
+export type ShelterStay = 'in_shelter' | 'exited'
+
 export type RegistryStatistics = {
   arrivalsByMonth: { count: number; month: string }[]
+  /** Exits by the month the person left (within the period), whenever they arrived. */
+  exitsByMonth?: { count: number; month: string }[]
+  /** People who arrived in the period (stay filter not applied) and days from attention to exit. */
+  shelterStay?: {
+    daysCount: number
+    exited: number
+    inShelter: number
+    medianDays: number | null
+    p25Days: number | null
+    p75Days: number | null
+  }
   dimensions: Record<StatisticsDimensionKey, StatisticsDimension>
   mexicoToMonterrey: {
     bins: StatisticsDayBin[]
@@ -65,6 +79,7 @@ export type RegistryStatistics = {
     ageUnknownExcluded?: number
     dateBasis: 'attentionDate'
     from: string | null
+    stay?: ShelterStay | null
     to: string | null
   }
   total: number
@@ -78,6 +93,7 @@ export const MISSING_ANSWER = 'Sin respuesta'
 export async function getRegistryStatistics(
   range: { from?: string | null; to?: string | null },
   age: AgeRange = { max: null, min: null },
+  stay: ShelterStay | null = null,
 ) {
   const params = new URLSearchParams()
 
@@ -95,6 +111,10 @@ export async function getRegistryStatistics(
 
   if (age.max !== null) {
     params.set('age_max', String(age.max))
+  }
+
+  if (stay) {
+    params.set('stay', stay)
   }
 
   const query = params.toString()

@@ -3009,6 +3009,124 @@
   resize: vertical;
 }
 
+/* Shelter exit (egreso) pop-up and stay filter */
+.shelter-exit__fields {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.shelter-exit__field {
+  display: grid;
+  gap: 0.4rem;
+  color: #0f2640;
+  font-size: 0.83rem;
+  font-weight: 760;
+}
+
+.shelter-exit__field input,
+.shelter-exit__field textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid rgba(24, 36, 55, 0.16);
+  border-radius: 8px;
+  background: #fffdf8;
+  color: #182437;
+  font: inherit;
+  font-weight: 400;
+}
+
+.shelter-exit__field textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.shelter-exit__field small {
+  color: #536171;
+  font-weight: 500;
+}
+
+.registry-stay-filter {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.registry-stay-filter > span {
+  color: #536171;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.registry-stay-filter__options {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  width: fit-content;
+  padding: 0.2rem;
+  border: 1px solid rgba(24, 36, 55, 0.14);
+  border-radius: 0.7rem;
+  background: #fff;
+}
+
+.registry-stay-filter__options button {
+  padding: 0.42rem 0.8rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: #536171;
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.registry-stay-filter__options button:hover {
+  background: rgba(24, 36, 55, 0.05);
+}
+
+.registry-stay-filter__options button[aria-pressed='true'] {
+  background: rgba(30, 79, 137, 0.12);
+  color: #0f2640;
+  font-weight: 750;
+}
+
+.registry-browser__stay {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.registry-browser__stay--in {
+  background: rgba(27, 175, 122, 0.14);
+  color: #0d5c40;
+}
+
+.registry-browser__stay--out {
+  background: rgba(111, 109, 104, 0.14);
+  color: #3d3c39;
+}
+
+.registry-browser__exit-reason {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-left: 3px solid rgba(111, 109, 104, 0.4);
+  background: rgba(111, 109, 104, 0.06);
+  color: #3d3c39;
+  font-size: 0.85rem;
+}
+
+.registry-browser__exit-reason small {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: #536171;
+  font-weight: 750;
+}
+
 .registry-approval-card__actions {
   display: flex;
   flex-wrap: wrap;
