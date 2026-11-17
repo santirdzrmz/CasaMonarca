@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\AuditEventType;
 use App\Models\MigrantArcoRequest;
 use App\Models\MigrantRegistryEntry;
+use App\Services\Audit\AuditEventService;
 use App\Services\Security\Encryption\EncryptionException;
 use App\Services\Security\Encryption\KeyRing;
 use App\Services\Security\Encryption\PrivateKeyDirectory;
@@ -56,6 +58,13 @@ class RegistryEncryptBackfill extends Command
         }
 
         app(KeyRing::class)->lock();
+
+        if (! $this->option('dry-run')) {
+            app(AuditEventService::class)->console(AuditEventType::RegistryEncryptionBackfilled, [], [
+                'purgedPlaintext' => $purge,
+                'failed' => $failures,
+            ]);
+        }
 
         return $failures === 0 ? self::SUCCESS : self::FAILURE;
     }

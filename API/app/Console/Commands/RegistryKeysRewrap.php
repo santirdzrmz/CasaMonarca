@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\AuditEventType;
 use App\Models\MigrantArcoRequest;
 use App\Models\MigrantRegistryEntry;
+use App\Services\Audit\AuditEventService;
 use App\Services\Security\Encryption\EncryptionException;
 use App\Services\Security\Encryption\EnvelopeCipher;
 use App\Services\Security\Encryption\KekDomain;
@@ -49,6 +51,16 @@ class RegistryKeysRewrap extends Command
         }
 
         $ring->lock();
+
+        if (! $dryRun) {
+            app(AuditEventService::class)->console(AuditEventType::RegistryKeysRewrapped, [], [
+                'activeKekIds' => [config('registry_encryption.public_keys.cand.id'), config('registry_encryption.public_keys.proc.id')],
+                'rewrapped' => $changed,
+                'unchanged' => $skipped,
+                'failed' => $failed,
+            ]);
+        }
+
         $this->info("Re-envueltos: $changed | sin cambios: $skipped | fallidos: $failed".($dryRun ? ' (simulación)' : ''));
         $this->line('Después de rotar, vuelve a entregar las llaves nuevas: registry:keys-grant para cada usuario.');
 

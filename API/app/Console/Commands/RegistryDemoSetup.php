@@ -9,8 +9,8 @@ use App\Models\User;
 use App\Services\Admin\UserDepartmentAssignmentService;
 use App\Services\Auth\TotpService;
 use App\Services\Security\Encryption\KeyFile;
+use App\Services\Security\Encryption\RegistryUserKeys;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class RegistryDemoSetup extends Command
@@ -86,17 +86,7 @@ class RegistryDemoSetup extends Command
             $path = $keysDir.DIRECTORY_SEPARATOR.strtolower($definition['role']->value).'.keyfile.json';
             file_put_contents($path, $keyFile['file']);
 
-            DB::table('registry_user_keys')->updateOrInsert(
-                ['user_id' => $user->getKey()],
-                [
-                    'public_key' => base64_encode($keyFile['public']),
-                    'signing_public_key' => base64_encode($keyFile['signing_public']),
-                    'fingerprint' => $keyFile['fingerprint'],
-                    'revoked_at' => null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ],
-            );
+            app(RegistryUserKeys::class)->enroll($user, $keyFile, 'registry:demo-setup', replace: true);
 
             $status = $this->callSilently('registry:keys-grant', [
                 'email' => $user->email,

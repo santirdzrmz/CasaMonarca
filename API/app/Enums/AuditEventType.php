@@ -40,6 +40,12 @@ enum AuditEventType: string
     case RegistryKeysUnlocked = 'registry.keys.unlocked';
     case RegistryKeysUnlockFailed = 'registry.keys.unlock.failed';
     case RegistryKeysLocked = 'registry.keys.locked';
+    case RegistryKeysEnrolled = 'registry.keys.enrolled';
+    case RegistryKeysGranted = 'registry.keys.granted';
+    case RegistryKeysRevoked = 'registry.keys.revoked';
+    case RegistryDomainKeysGenerated = 'registry.keys.domain_generated';
+    case RegistryKeysRewrapped = 'registry.keys.rewrapped';
+    case RegistryEncryptionBackfilled = 'registry.encryption.backfilled';
     case RegistryAccessRequested = 'registry.access.requested';
     case RegistryAccessGranted = 'registry.access.granted';
     case RegistryAccessDenied = 'registry.access.denied';

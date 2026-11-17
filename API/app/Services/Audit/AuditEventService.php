@@ -39,6 +39,23 @@ class AuditEventService
     }
 
     /**
+     * Records an action run from the command line (artisan). There is no signed-in actor, so the event says
+     * it came from the console and which operating-system account ran it.
+     *
+     * @param  array{type?: string|null, id?: int|string|null}  $resource
+     * @param  array<string, mixed>  $metadata
+     */
+    public function console(AuditEventType $eventType, array $resource = [], array $metadata = []): AuditEvent
+    {
+        return $this->record(request(), $eventType, AuditEventOutcome::Success, null, $resource, [
+            ...$metadata,
+            'via' => 'console',
+            'command' => implode(' ', array_slice((array) ($_SERVER['argv'] ?? []), 1, 2)) ?: null,
+            'osUser' => function_exists('get_current_user') ? get_current_user() : null,
+        ]);
+    }
+
+    /**
      * @param  array{
      *     type?: string|null,
      *     id?: int|string|null,

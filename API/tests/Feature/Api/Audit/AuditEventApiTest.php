@@ -57,6 +57,24 @@ class AuditEventApiTest extends TestCase
             ]);
     }
 
+    public function test_admin_can_filter_registry_key_and_migrant_events_by_category(): void
+    {
+        $admin = User::factory()->create(['role' => UserRole::Admin->value]);
+
+        foreach ([AuditEventType::RegistryKeysEnrolled, AuditEventType::MigrantRegistryExitRecorded, AuditEventType::AuthLogout] as $type) {
+            AuditEvent::query()->create([
+                'occurred_at' => now('UTC'),
+                'event_type' => $type->value,
+                'outcome' => AuditEventOutcome::Success->value,
+            ]);
+        }
+
+        foreach (['registry' => AuditEventType::RegistryKeysEnrolled, 'migrant' => AuditEventType::MigrantRegistryExitRecorded] as $category => $type) {
+            $events = $this->actingAs($admin)->getJson("/audit-events?category={$category}")->assertOk()->json('events');
+            $this->assertSame([$type->value], array_column($events, 'eventType'));
+        }
+    }
+
     public function test_admin_can_page_search_and_filter_audit_events(): void
     {
         $admin = User::factory()->create([

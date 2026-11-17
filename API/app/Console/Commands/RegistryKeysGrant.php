@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\AuditEventType;
 use App\Models\User;
+use App\Services\Audit\AuditEventService;
 use App\Services\Security\Encryption\EncryptionException;
 use App\Services\Security\Encryption\KeyGrants;
 use App\Services\Security\Encryption\PrivateKeyDirectory;
@@ -74,6 +76,13 @@ class RegistryKeysGrant extends Command
 
             $granted[] = $kekId;
         }
+
+        app(AuditEventService::class)->console(AuditEventType::RegistryKeysGranted, ['type' => User::class, 'id' => $user->getKey()], [
+            'email' => $user->email,
+            'fingerprint' => $key->fingerprint,
+            'kekIds' => $granted,
+            'expiresAt' => $expires->toDateString(),
+        ]);
 
         $this->info('Entregadas a '.$user->email.': '.implode(', ', $granted).' (vencen '.$expires->toDateString().').');
 

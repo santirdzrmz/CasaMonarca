@@ -33,7 +33,7 @@ export type AuditEventSummary = {
   resource: AuditEventResource
 }
 
-export type AuditEventCategory = 'account' | 'admin' | 'auth' | 'document' | 'security' | 'vcs'
+export type AuditEventCategory = 'account' | 'admin' | 'auth' | 'document' | 'migrant' | 'registry' | 'security' | 'vcs'
 
 export type AuditEventPagination = {
   hasNextPage: boolean

@@ -71,7 +71,7 @@ administrador no escriben eventos de auditoría; deja constancia de su ejecució
 | Comando | Quién y dónde | Qué hace |
 |---|---|---|
 | `registry:keys-init --private-dir=… --age-recipient=age1…` | Administrador, en su computadora | Genera `pk:cand-N` y `pk:proc-N`; imprime las llaves públicas para el `.env` |
-| `registry:keys-enroll <email> --out=…` | Administrador, con el usuario presente | Crea el archivo de llave personal (cifrado y firma) y registra las llaves públicas; imprime la huella |
+| `registry:keys-enroll <email> --out=… [--replace]` | Administrador, con el usuario presente | Crea el archivo de llave personal (cifrado y firma) y registra las llaves públicas; imprime la huella. Si el usuario ya tiene una llave activa exige `--replace`: la anterior queda en el historial y sus entregas se revocan |
 | `registry:keys-grant <email> --fingerprint=… --private-dir=… --age-identity=…` | Administrador | Cifra las llaves privadas de dominio con la llave pública del usuario (vencen en 90 días) |
 | `registry:keys-revoke <email>` | Administrador | Revoca la llave y las entregas |
 | `registry:keys-rewrap --private-dir=… [--dry-run]` | Administrador | Rotación: vuelve a envolver todas las DEK con la llave activa (`--generation=N+1`) sin tocar el contenido |
@@ -81,6 +81,26 @@ administrador no escriben eventos de auditoría; deja constancia de su ejecució
 que un servidor comprometido no pueda sustituir su llave sin que se note. El registro de llaves públicas firmantes
 (`registry_user_keys`) cumple el papel de un certificado ligero: si más adelante se quiere una CA con certificados X.509,
 sustituye ese registro sin cambiar el resto.
+
+### Historial y bitácora
+
+- `registry_user_keys` guarda solo la llave **vigente** de cada usuario; `registry_user_key_history` guarda **todas** las
+  llaves públicas que ha tenido, con su fecha de alta y cuándo y por qué dejaron de valer (`replaced` o `revoked`).
+- Cada comando escribe un evento en la bitácora (categoría **Llaves y cifrado del registro**), con `via: console` y el
+  usuario del sistema operativo que lo ejecutó:
+
+| Evento | Comando | Datos que guarda |
+|---|---|---|
+| `registry.keys.domain_generated` | `keys-init` | Ids y llaves **públicas** de dominio, protección de las privadas (`age` / `plain`) |
+| `registry.keys.enrolled` | `keys-enroll`, `demo-setup` | Usuario, huella, llaves públicas (cifrado y firma), huella reemplazada, entregas revocadas |
+| `registry.keys.granted` | `keys-grant` | Usuario, huella, dominios entregados, vencimiento |
+| `registry.keys.revoked` | `keys-revoke` | Usuario, huella, entregas revocadas |
+| `registry.keys.rewrapped` | `keys-rewrap` | Llaves activas y conteo de sobres re-envueltos o fallidos |
+| `registry.encryption.backfilled` | `encrypt-backfill` | Si se borró el texto plano y cuántos fallaron |
+| `registry.keys.unlocked` / `.locked` / `.unlock.failed` | Web | Desbloqueo y bloqueo por sesión |
+| `registry.access.*` | Web | Accesos temporales de operadores (pedido, concedido, negado, revocado, usado) |
+
+Nunca se registran llaves privadas ni contraseñas de archivos de llave.
 
 ## Puesta en marcha (en orden)
 

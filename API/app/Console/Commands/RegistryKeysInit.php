@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\AuditEventType;
+use App\Services\Audit\AuditEventService;
 use App\Services\Security\Encryption\AgeCli;
 use App\Services\Security\Encryption\EncryptionException;
 use App\Services\Security\Encryption\KeyGrants;
@@ -36,6 +38,7 @@ class RegistryKeysInit extends Command
         }
 
         $env = [];
+        $publicKeys = [];
 
         foreach (['cand', 'proc'] as $domain) {
             $id = "pk:{$domain}-{$generation}";
@@ -57,7 +60,14 @@ class RegistryKeysInit extends Command
             $upper = strtoupper($domain);
             $env[] = "REGISTRY_PK_{$upper}_ID=$id";
             $env[] = "REGISTRY_PK_{$upper}_PUBLIC=".base64_encode(sodium_crypto_box_publickey($pair));
+            $publicKeys[$id] = base64_encode(sodium_crypto_box_publickey($pair));
         }
+
+        app(AuditEventService::class)->console(AuditEventType::RegistryDomainKeysGenerated, [], [
+            'generation' => $generation,
+            'publicKeys' => $publicKeys,
+            'privateKeyProtection' => $recipient !== '' ? 'age' : 'plain',
+        ]);
 
         $this->info("Llaves privadas guardadas en $dir. NO las copies al servidor ni al repositorio.");
         $this->line('Copia SOLO estas líneas (llaves públicas) al .env del servidor:');

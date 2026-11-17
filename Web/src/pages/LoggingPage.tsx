@@ -67,6 +67,8 @@ const AUDIT_CATEGORIES: Array<{ label: string; value: AuditEventCategory }> = [
   { label: t("Admin actions", "Acciones administrativas"), value: 'admin' },
   { label: t("Authentication", "Autenticación"), value: 'auth' },
   { label: t("Documents", "Documentos"), value: 'document' },
+  { label: t("Migrant registry", "Registro de migrantes"), value: 'migrant' },
+  { label: t("Registry keys and encryption", "Llaves y cifrado del registro"), value: 'registry' },
   { label: t("Security challenges", "Retos de seguridad"), value: 'security' },
   { label: 'VCS', value: 'vcs' },
 ]
@@ -179,6 +181,8 @@ const classifyClearance = (event: AuditEventSummary): AuditClearance => {
 
   if (
     eventType.startsWith('admin.') ||
+    eventType.startsWith('registry.keys.') ||
+    eventType.startsWith('registry.encryption.') ||
     eventType.startsWith('account.invite') ||
     eventType.startsWith('vcs.')
   ) {

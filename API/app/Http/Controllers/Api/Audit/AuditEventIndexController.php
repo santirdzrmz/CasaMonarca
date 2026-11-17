@@ -14,7 +14,7 @@ class AuditEventIndexController extends Controller
     public function __invoke(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'category' => ['nullable', 'string', 'in:account,admin,auth,document,security,vcs'],
+            'category' => ['nullable', 'string', 'in:account,admin,auth,document,migrant,registry,security,vcs'],
             'department' => ['nullable', 'string', Rule::enum(Department::class)],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'outcome' => ['nullable', 'string', 'in:denied,failure,success'],
