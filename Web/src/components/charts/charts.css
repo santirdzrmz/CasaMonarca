@@ -89,6 +89,7 @@
 }
 
 .viz-filters input[type='date'],
+.viz-filters input[type='number'],
 .viz-filters select {
   padding: 0.42rem 0.6rem;
   border: 1px solid rgba(19, 35, 58, 0.18);
@@ -99,10 +100,29 @@
   font-size: 0.86rem;
 }
 
+.viz-filters input[type='number'] {
+  width: 6.5rem;
+}
+
 .viz-filters__range {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.viz-filters__clear {
+  padding: 0.4rem 0.7rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: rgba(19, 35, 58, 0.05);
+  color: var(--viz-text-secondary);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.viz-filters__clear:hover {
+  background: rgba(19, 35, 58, 0.1);
 }
 
 /* Refetch keeps the frame: previous render at reduced opacity, no skeleton. */

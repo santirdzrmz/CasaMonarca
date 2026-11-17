@@ -121,36 +121,33 @@ describe('MigrantStatisticsPage', () => {
     })
   })
 
-  it('refetches with an age preset and with a custom age range', async () => {
+  it('filters by one exact age and can go back to all ages', async () => {
     render(<MigrantStatisticsPage user={user} />)
     await screen.findByRole('heading', { name: 'Llegadas por mes' })
-    const ageGroup = within(screen.getByRole('group', { name: 'Rango de edad' }))
 
-    await userEvent.click(ageGroup.getByRole('button', { name: '18–59 años' }))
+    await userEvent.type(screen.getByLabelText('Edad (años)'), '25')
 
     await waitFor(() => {
-      expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[1]).toEqual({ max: 59, min: 18 })
+      expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[1]).toEqual({ max: 25, min: 25 })
     })
 
-    await userEvent.click(ageGroup.getByRole('button', { name: 'Personalizado' }))
-    await userEvent.type(screen.getByLabelText('Edad mínima'), '5')
-    await userEvent.type(screen.getByLabelText('Edad máxima'), '9')
+    await userEvent.click(screen.getByRole('button', { name: 'Todas las edades' }))
 
     await waitFor(() => {
-      expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[1]).toEqual({ max: 9, min: 5 })
+      expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[1]).toEqual({ max: null, min: null })
     })
   })
 
   it('says how many records without an age the filter leaves out', async () => {
     vi.mocked(statistics.getRegistryStatistics).mockResolvedValue({
       ...sample,
-      range: { ...sample.range, ageMax: 59, ageMin: 18, ageUnknownExcluded: 3 },
+      range: { ...sample.range, ageMax: 30, ageMin: 30, ageUnknownExcluded: 3 },
     })
     render(<MigrantStatisticsPage user={user} />)
     await screen.findByRole('heading', { name: 'Llegadas por mes' })
 
-    await userEvent.click(within(screen.getByRole('group', { name: 'Rango de edad' })).getByRole('button', { name: '18–59 años' }))
+    await userEvent.type(screen.getByLabelText('Edad (años)'), '30')
 
-    expect(await screen.findByText(/de 18 a 59 años\. 3 sin edad registrada quedan fuera\./)).toBeInTheDocument()
+    expect(await screen.findByText(/de 30 años\. 3 sin edad registrada quedan fuera\./)).toBeInTheDocument()
   })
 })

@@ -37,18 +37,11 @@ const PRESETS: { id: PresetId; label: string }[] = [
   { id: 'custom', label: t('Custom', 'Personalizado') },
 ]
 
-type AgePresetId = 'all' | 'children' | 'teens' | 'adults' | 'seniors' | 'custom'
-
-const AGE_PRESETS: { id: Exclude<AgePresetId, 'custom'>; label: string; range: AgeRange }[] = [
-  { id: 'all', label: t('All ages', 'Todas'), range: { max: null, min: null } },
-  { id: 'children', label: t('0–11 years', '0–11 años'), range: { max: 11, min: 0 } },
-  { id: 'teens', label: t('12–17 years', '12–17 años'), range: { max: 17, min: 12 } },
-  { id: 'adults', label: t('18–59 years', '18–59 años'), range: { max: 59, min: 18 } },
-  { id: 'seniors', label: t('60 and over', '60 o más'), range: { max: null, min: 60 } },
-]
-
 const MAX_AGE = 120
 
+const ALL_AGES: AgeRange = { max: null, min: null }
+
+/** A whole age in years, or null for an empty or out-of-range value. */
 const parseAge = (value: string): number | null => {
   if (value.trim() === '') {
     return null
@@ -59,20 +52,12 @@ const parseAge = (value: string): number | null => {
   return Number.isInteger(age) && age >= 0 && age <= MAX_AGE ? age : null
 }
 
-const describeAge = ({ max, min }: AgeRange): string | null => {
-  if (min === null && max === null) {
+const describeAge = ({ min }: AgeRange): string | null => {
+  if (min === null) {
     return null
   }
 
-  if (max === null) {
-    return t(`aged ${min} and over`, `de ${min} años o más`)
-  }
-
-  if (min === null || min === 0) {
-    return t(`aged up to ${max}`, `de hasta ${max} años`)
-  }
-
-  return t(`aged ${min}–${max}`, `de ${min} a ${max} años`)
+  return min === 1 ? t('aged 1', 'de 1 año') : t(`aged ${min}`, `de ${min} años`)
 }
 
 const isoDate = (date: Date) => {
@@ -151,9 +136,8 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
   const [preset, setPreset] = useState<PresetId>('last365')
   const [range, setRange] = useState<Range>(() => presetRange('last365'))
   const [customRange, setCustomRange] = useState<Range>(() => presetRange('last90'))
-  const [agePreset, setAgePreset] = useState<AgePresetId>('all')
-  const [ageRange, setAgeRange] = useState<AgeRange>({ max: null, min: null })
-  const [customAge, setCustomAge] = useState({ max: '', min: '' })
+  const [ageRange, setAgeRange] = useState<AgeRange>(ALL_AGES)
+  const [ageInput, setAgeInput] = useState('')
   const [stackKey, setStackKey] = useState<StatisticsDimensionKey>('gender')
   const [data, setData] = useState<RegistryStatistics | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -221,36 +205,18 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
     }
   }
 
-  const changeAge = (next: AgeRange) => {
-    setLoading(true)
-    setAgeRange(next)
-  }
+  // One exact age: the API is asked for that age as both ends of its range.
+  const updateAge = (value: string) => {
+    setAgeInput(value)
+    const age = parseAge(value)
 
-  const selectAgePreset = (id: AgePresetId) => {
-    setAgePreset(id)
-
-    if (id !== 'custom') {
-      changeAge(AGE_PRESETS.find((item) => item.id === id)?.range ?? { max: null, min: null })
+    if (value.trim() !== '' && age === null) {
       return
     }
 
-    const min = parseAge(customAge.min)
-    const max = parseAge(customAge.max)
-
-    if (min === null || max === null || min <= max) {
-      changeAge({ max, min })
-    }
-  }
-
-  const updateCustomAge = (next: { max: string; min: string }) => {
-    setCustomAge(next)
-    const min = parseAge(next.min)
-    const max = parseAge(next.max)
-    // Apply only complete, ordered values; a half-typed or inverted range keeps the last one.
-    const valid = (next.min.trim() === '' || min !== null) && (next.max.trim() === '' || max !== null) && (min === null || max === null || min <= max)
-
-    if (valid && (min !== ageRange.min || max !== ageRange.max)) {
-      changeAge({ max, min })
+    if (age !== ageRange.min) {
+      setLoading(true)
+      setAgeRange(age === null ? ALL_AGES : { max: age, min: age })
     }
   }
 
@@ -382,50 +348,25 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
           ) : null}
 
           <div className="viz-filters__group">
-            <span className="viz-filters__label">{t('Age', 'Edad')}</span>
-            <div className="viz-presets" role="group" aria-label={t('Age range', 'Rango de edad')}>
-              {[...AGE_PRESETS, { id: 'custom' as const, label: t('Custom', 'Personalizado') }].map((item) => (
-                <button
-                  aria-pressed={agePreset === item.id}
-                  key={item.id}
-                  onClick={() => selectAgePreset(item.id)}
-                  type="button"
-                >
-                  {agePreset === item.id ? <span aria-hidden="true" className="viz-presets__check">✓</span> : null}
-                  {item.label}
+            <label className="viz-filters__label" htmlFor="statistics-age">{t('Age (years)', 'Edad (años)')}</label>
+            <div className="viz-filters__range">
+              <input
+                id="statistics-age"
+                inputMode="numeric"
+                max={MAX_AGE}
+                min={0}
+                onChange={(event) => updateAge(event.target.value)}
+                placeholder={t('All', 'Todas')}
+                type="number"
+                value={ageInput}
+              />
+              {ageInput !== '' ? (
+                <button className="viz-filters__clear" onClick={() => updateAge('')} type="button">
+                  {t('All ages', 'Todas las edades')}
                 </button>
-              ))}
+              ) : null}
             </div>
           </div>
-
-          {agePreset === 'custom' ? (
-            <div className="viz-filters__group">
-              <span className="viz-filters__label">{t('Age from – to', 'Edad desde – hasta')}</span>
-              <div className="viz-filters__range">
-                <input
-                  aria-label={t('Minimum age', 'Edad mínima')}
-                  inputMode="numeric"
-                  max={MAX_AGE}
-                  min={0}
-                  onChange={(event) => updateCustomAge({ ...customAge, min: event.target.value })}
-                  placeholder="0"
-                  type="number"
-                  value={customAge.min}
-                />
-                <span aria-hidden="true">–</span>
-                <input
-                  aria-label={t('Maximum age', 'Edad máxima')}
-                  inputMode="numeric"
-                  max={MAX_AGE}
-                  min={0}
-                  onChange={(event) => updateCustomAge({ ...customAge, max: event.target.value })}
-                  placeholder={String(MAX_AGE)}
-                  type="number"
-                  value={customAge.max}
-                />
-              </div>
-            </div>
-          ) : null}
 
           <label className="viz-filters__group">
             <span className="viz-filters__label">{t('Monthly breakdown by', 'Desglose mensual por')}</span>
