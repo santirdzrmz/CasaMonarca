@@ -13,6 +13,7 @@ import { translate as t } from '../../lib/i18n'
 import {
   getRegistryStatistics,
   MISSING_ANSWER,
+  type AgeRange,
   type RegistryStatistics,
   type StatisticsCategory,
   type StatisticsDimension,
@@ -35,6 +36,44 @@ const PRESETS: { id: PresetId; label: string }[] = [
   { id: 'all', label: t('All time', 'Todo') },
   { id: 'custom', label: t('Custom', 'Personalizado') },
 ]
+
+type AgePresetId = 'all' | 'children' | 'teens' | 'adults' | 'seniors' | 'custom'
+
+const AGE_PRESETS: { id: Exclude<AgePresetId, 'custom'>; label: string; range: AgeRange }[] = [
+  { id: 'all', label: t('All ages', 'Todas'), range: { max: null, min: null } },
+  { id: 'children', label: t('0–11 years', '0–11 años'), range: { max: 11, min: 0 } },
+  { id: 'teens', label: t('12–17 years', '12–17 años'), range: { max: 17, min: 12 } },
+  { id: 'adults', label: t('18–59 years', '18–59 años'), range: { max: 59, min: 18 } },
+  { id: 'seniors', label: t('60 and over', '60 o más'), range: { max: null, min: 60 } },
+]
+
+const MAX_AGE = 120
+
+const parseAge = (value: string): number | null => {
+  if (value.trim() === '') {
+    return null
+  }
+
+  const age = Number(value)
+
+  return Number.isInteger(age) && age >= 0 && age <= MAX_AGE ? age : null
+}
+
+const describeAge = ({ max, min }: AgeRange): string | null => {
+  if (min === null && max === null) {
+    return null
+  }
+
+  if (max === null) {
+    return t(`aged ${min} and over`, `de ${min} años o más`)
+  }
+
+  if (min === null || min === 0) {
+    return t(`aged up to ${max}`, `de hasta ${max} años`)
+  }
+
+  return t(`aged ${min}–${max}`, `de ${min} a ${max} años`)
+}
 
 const isoDate = (date: Date) => {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
@@ -112,6 +151,9 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
   const [preset, setPreset] = useState<PresetId>('last365')
   const [range, setRange] = useState<Range>(() => presetRange('last365'))
   const [customRange, setCustomRange] = useState<Range>(() => presetRange('last90'))
+  const [agePreset, setAgePreset] = useState<AgePresetId>('all')
+  const [ageRange, setAgeRange] = useState<AgeRange>({ max: null, min: null })
+  const [customAge, setCustomAge] = useState({ max: '', min: '' })
   const [stackKey, setStackKey] = useState<StatisticsDimensionKey>('gender')
   const [data, setData] = useState<RegistryStatistics | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -122,7 +164,7 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
   useEffect(() => {
     let active = true
 
-    getRegistryStatistics(range)
+    getRegistryStatistics(range, ageRange)
       .then((response) => {
         if (active) {
           setData(response)
@@ -159,7 +201,7 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
     return () => {
       active = false
     }
-  }, [onSessionExpired, range, reloadCount])
+  }, [ageRange, onSessionExpired, range, reloadCount])
 
   const changeRange = (next: Range) => {
     setLoading(true)
@@ -176,6 +218,39 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
 
     if (next.from && next.to && next.from <= next.to) {
       changeRange(next)
+    }
+  }
+
+  const changeAge = (next: AgeRange) => {
+    setLoading(true)
+    setAgeRange(next)
+  }
+
+  const selectAgePreset = (id: AgePresetId) => {
+    setAgePreset(id)
+
+    if (id !== 'custom') {
+      changeAge(AGE_PRESETS.find((item) => item.id === id)?.range ?? { max: null, min: null })
+      return
+    }
+
+    const min = parseAge(customAge.min)
+    const max = parseAge(customAge.max)
+
+    if (min === null || max === null || min <= max) {
+      changeAge({ max, min })
+    }
+  }
+
+  const updateCustomAge = (next: { max: string; min: string }) => {
+    setCustomAge(next)
+    const min = parseAge(next.min)
+    const max = parseAge(next.max)
+    // Apply only complete, ordered values; a half-typed or inverted range keeps the last one.
+    const valid = (next.min.trim() === '' || min !== null) && (next.max.trim() === '' || max !== null) && (min === null || max === null || min <= max)
+
+    if (valid && (min !== ageRange.min || max !== ageRange.max)) {
+      changeAge({ max, min })
     }
   }
 
@@ -235,6 +310,8 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
   const dayBins = days.bins.map((bin) => ({ key: bin.label, label: bin.label, values: { count: bin.count } }))
   const services = data.requestedServices
   const serviceRows = toRows(services.services)
+  const ageLabel = describeAge(ageRange)
+  const ageUnknown = data.range.ageUnknownExcluded ?? 0
 
   const categoryCards: { key: StatisticsDimensionKey; rows: BarListRow[]; subtitle?: string }[] = [
     {
@@ -304,6 +381,52 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
             </div>
           ) : null}
 
+          <div className="viz-filters__group">
+            <span className="viz-filters__label">{t('Age', 'Edad')}</span>
+            <div className="viz-presets" role="group" aria-label={t('Age range', 'Rango de edad')}>
+              {[...AGE_PRESETS, { id: 'custom' as const, label: t('Custom', 'Personalizado') }].map((item) => (
+                <button
+                  aria-pressed={agePreset === item.id}
+                  key={item.id}
+                  onClick={() => selectAgePreset(item.id)}
+                  type="button"
+                >
+                  {agePreset === item.id ? <span aria-hidden="true" className="viz-presets__check">✓</span> : null}
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {agePreset === 'custom' ? (
+            <div className="viz-filters__group">
+              <span className="viz-filters__label">{t('Age from – to', 'Edad desde – hasta')}</span>
+              <div className="viz-filters__range">
+                <input
+                  aria-label={t('Minimum age', 'Edad mínima')}
+                  inputMode="numeric"
+                  max={MAX_AGE}
+                  min={0}
+                  onChange={(event) => updateCustomAge({ ...customAge, min: event.target.value })}
+                  placeholder="0"
+                  type="number"
+                  value={customAge.min}
+                />
+                <span aria-hidden="true">–</span>
+                <input
+                  aria-label={t('Maximum age', 'Edad máxima')}
+                  inputMode="numeric"
+                  max={MAX_AGE}
+                  min={0}
+                  onChange={(event) => updateCustomAge({ ...customAge, max: event.target.value })}
+                  placeholder={String(MAX_AGE)}
+                  type="number"
+                  value={customAge.max}
+                />
+              </div>
+            </div>
+          ) : null}
+
           <label className="viz-filters__group">
             <span className="viz-filters__label">{t('Monthly breakdown by', 'Desglose mensual por')}</span>
             <select onChange={(event) => setStackKey(event.target.value as StatisticsDimensionKey)} value={stackKey}>
@@ -322,7 +445,14 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
           <div className="viz-tile">
             <p className="viz-tile__label">{t('People who arrived', 'Personas que llegaron')}</p>
             <p className="viz-tile__value viz-tile__value--hero">{formatCount(total)}</p>
-            <p className="viz-tile__note">{t('Approved registrations in the period.', 'Registros aprobados en el periodo.')}</p>
+            <p className="viz-tile__note">
+              {ageLabel
+                ? t(`Approved registrations in the period, ${ageLabel}.`, `Registros aprobados en el periodo, ${ageLabel}.`)
+                : t('Approved registrations in the period.', 'Registros aprobados en el periodo.')}
+              {ageLabel && ageUnknown > 0
+                ? t(` ${formatCount(ageUnknown)} without a recorded age are left out.`, ` ${formatCount(ageUnknown)} sin edad registrada quedan fuera.`)
+                : null}
+            </p>
           </div>
           <div className="viz-tile">
             <p className="viz-tile__label">{t('Median days from entering Mexico to Monterrey', 'Mediana de días de México a Monterrey')}</p>

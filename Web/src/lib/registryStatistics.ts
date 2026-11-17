@@ -59,6 +59,10 @@ export type RegistryStatistics = {
   }
   requestedServices: RequestedServices
   range: {
+    ageMax?: number | null
+    ageMin?: number | null
+    /** Records left out only because they have no age or birth date (age filter active). */
+    ageUnknownExcluded?: number
     dateBasis: 'attentionDate'
     from: string | null
     to: string | null
@@ -66,9 +70,15 @@ export type RegistryStatistics = {
   total: number
 }
 
+/** Age in whole years at the attention date; null leaves that end open. */
+export type AgeRange = { max: number | null; min: number | null }
+
 export const MISSING_ANSWER = 'Sin respuesta'
 
-export async function getRegistryStatistics(range: { from?: string | null; to?: string | null }) {
+export async function getRegistryStatistics(
+  range: { from?: string | null; to?: string | null },
+  age: AgeRange = { max: null, min: null },
+) {
   const params = new URLSearchParams()
 
   if (range.from) {
@@ -77,6 +87,14 @@ export async function getRegistryStatistics(range: { from?: string | null; to?: 
 
   if (range.to) {
     params.set('to', range.to)
+  }
+
+  if (age.min !== null) {
+    params.set('age_min', String(age.min))
+  }
+
+  if (age.max !== null) {
+    params.set('age_max', String(age.max))
   }
 
   const query = params.toString()

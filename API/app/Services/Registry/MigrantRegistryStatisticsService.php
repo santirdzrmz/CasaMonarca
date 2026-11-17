@@ -94,8 +94,10 @@ class MigrantRegistryStatisticsService
     /**
      * @return array<string, mixed>
      */
-    public function summarize(?CarbonImmutable $from, ?CarbonImmutable $to): array
+    public function summarize(?CarbonImmutable $from, ?CarbonImmutable $to, ?int $ageMin = null, ?int $ageMax = null): array
     {
+        $ageFiltered = $ageMin !== null || $ageMax !== null;
+        $ageUnknownExcluded = 0;
         $definition = $this->definitionService->definition();
         $mapping = $definition['summaryMappings'] ?? [];
         $dimensions = $this->dimensionDefinitions($definition, $mapping);
@@ -129,6 +131,20 @@ class MigrantRegistryStatisticsService
 
             if ($referenceDate === null || ($from && $referenceDate->lt($from)) || ($to && $referenceDate->gt($to))) {
                 continue;
+            }
+
+            if ($ageFiltered) {
+                $age = $this->age($answers, $mapping, $referenceDate);
+
+                if ($age === null) {
+                    $ageUnknownExcluded++;
+
+                    continue;
+                }
+
+                if (($ageMin !== null && $age < $ageMin) || ($ageMax !== null && $age > $ageMax)) {
+                    continue;
+                }
             }
 
             $total++;
@@ -179,6 +195,10 @@ class MigrantRegistryStatisticsService
                 'from' => $from?->toDateString(),
                 'to' => $to?->toDateString(),
                 'dateBasis' => 'attentionDate',
+                'ageMin' => $ageMin,
+                'ageMax' => $ageMax,
+                // Records left out only because neither age nor birth date was answered.
+                'ageUnknownExcluded' => $ageUnknownExcluded,
             ],
             'total' => $total,
             'arrivalsByMonth' => array_map(
@@ -419,6 +439,38 @@ class MigrantRegistryStatisticsService
         $value = is_array($answer) ? ($answer['value'] ?? null) : null;
 
         return is_string($value) && trim($value) !== '' ? trim($value) : self::MISSING;
+    }
+
+    /**
+     * Age in whole years at the attention date: the "Edad" answer ("0 - 11 meses" counts as 0),
+     * else computed from the birth date. Null when neither gives a plausible age.
+     *
+     * @param  array<string, mixed>  $answers
+     * @param  array<string, string>  $mapping
+     */
+    private function age(array $answers, array $mapping, CarbonImmutable $referenceDate): ?int
+    {
+        $answer = $this->choice($answers[$mapping['age'] ?? ''] ?? null);
+
+        if ($answer !== self::MISSING) {
+            if (str_contains($answer, 'meses')) {
+                return 0;
+            }
+
+            if (ctype_digit($answer)) {
+                return (int) $answer;
+            }
+        }
+
+        $birthDate = $this->date($answers[$mapping['birthDate'] ?? ''] ?? null);
+
+        if ($birthDate === null || $birthDate->gt($referenceDate)) {
+            return null;
+        }
+
+        $years = (int) $birthDate->diffInYears($referenceDate);
+
+        return $years <= 120 ? $years : null;
     }
 
     private function date(mixed $answer): ?CarbonImmutable

@@ -117,7 +117,40 @@ describe('MigrantStatisticsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Todo' }))
 
     await waitFor(() => {
-      expect(statistics.getRegistryStatistics).toHaveBeenLastCalledWith({ from: null, to: null })
+      expect(statistics.getRegistryStatistics).toHaveBeenLastCalledWith({ from: null, to: null }, { max: null, min: null })
     })
+  })
+
+  it('refetches with an age preset and with a custom age range', async () => {
+    render(<MigrantStatisticsPage user={user} />)
+    await screen.findByRole('heading', { name: 'Llegadas por mes' })
+    const ageGroup = within(screen.getByRole('group', { name: 'Rango de edad' }))
+
+    await userEvent.click(ageGroup.getByRole('button', { name: '18–59 años' }))
+
+    await waitFor(() => {
+      expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[1]).toEqual({ max: 59, min: 18 })
+    })
+
+    await userEvent.click(ageGroup.getByRole('button', { name: 'Personalizado' }))
+    await userEvent.type(screen.getByLabelText('Edad mínima'), '5')
+    await userEvent.type(screen.getByLabelText('Edad máxima'), '9')
+
+    await waitFor(() => {
+      expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[1]).toEqual({ max: 9, min: 5 })
+    })
+  })
+
+  it('says how many records without an age the filter leaves out', async () => {
+    vi.mocked(statistics.getRegistryStatistics).mockResolvedValue({
+      ...sample,
+      range: { ...sample.range, ageMax: 59, ageMin: 18, ageUnknownExcluded: 3 },
+    })
+    render(<MigrantStatisticsPage user={user} />)
+    await screen.findByRole('heading', { name: 'Llegadas por mes' })
+
+    await userEvent.click(within(screen.getByRole('group', { name: 'Rango de edad' })).getByRole('button', { name: '18–59 años' }))
+
+    expect(await screen.findByText(/de 18 a 59 años\. 3 sin edad registrada quedan fuera\./)).toBeInTheDocument()
   })
 })

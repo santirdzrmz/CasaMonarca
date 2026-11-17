@@ -23,6 +23,8 @@ class MigrantRegistryStatisticsApiTest extends TestCase
     private const MEXICO_ENTRY = 'rb5d53bd5db9045dd8fe0b1dc849acdf4';
     private const DESTINATION = 'r2bbdd2ae059d41b988ef4e55381fafde';
     private const SERVICES = 'r245485c3e8c5489ba5f554637d370ad7';
+    private const AGE = 'rce625b31357e425ea492b6a99bce67c5';
+    private const BIRTH = 'r1a57098392944e63882969e6150cdd98';
 
     private const URL = '/registry/migrants/statistics';
 
@@ -146,6 +148,39 @@ class MigrantRegistryStatisticsApiTest extends TestCase
         );
     }
 
+    public function test_age_filter_uses_age_or_birth_date_and_reports_unknown_ages(): void
+    {
+        $this->entry(['attention' => '2026-02-01', 'age' => '30']);
+        $this->entry(['attention' => '2026-02-01', 'age' => '0 - 11 meses']);
+        $this->entry(['attention' => '2026-02-01', 'age' => '15']);
+        $this->entry(['attention' => '2026-02-01', 'birth' => '2000-01-01']); // 26 at attention
+        $this->entry(['attention' => '2026-02-01']); // no age at all
+
+        $admin = $this->enrolled(UserRole::Admin);
+
+        $this->actingAs($admin)->getJson(self::URL.'?age_min=18&age_max=59')
+            ->assertOk()
+            ->assertJsonPath('data.total', 2)
+            ->assertJsonPath('data.range.ageMin', 18)
+            ->assertJsonPath('data.range.ageUnknownExcluded', 1);
+
+        $this->actingAs($admin)->getJson(self::URL.'?age_max=17')->assertJsonPath('data.total', 2);
+        $this->actingAs($admin)->getJson(self::URL.'?age_min=60')->assertOk()->assertJsonPath('data.total', 0);
+
+        // Without an age filter nobody is left out for a missing age.
+        $this->actingAs($admin)->getJson(self::URL)
+            ->assertJsonPath('data.total', 5)
+            ->assertJsonPath('data.range.ageUnknownExcluded', 0);
+    }
+
+    public function test_inverted_age_ranges_are_rejected(): void
+    {
+        $this->actingAs($this->enrolled(UserRole::Admin))
+            ->getJson(self::URL.'?age_min=40&age_max=20')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('age_max');
+    }
+
     public function test_invalid_ranges_are_rejected(): void
     {
         $this->actingAs($this->enrolled(UserRole::Admin))
@@ -163,7 +198,7 @@ class MigrantRegistryStatisticsApiTest extends TestCase
             'attention' => self::ATTENTION, 'gender' => self::GENDER, 'country' => self::COUNTRY,
             'civil' => self::CIVIL, 'literacy' => self::LITERACY, 'eduAdult' => self::EDU_ADULT,
             'eduMinor' => self::EDU_MINOR, 'mexico' => self::MEXICO_ENTRY, 'destination' => self::DESTINATION,
-            'services' => self::SERVICES,
+            'services' => self::SERVICES, 'age' => self::AGE, 'birth' => self::BIRTH,
         ];
         $answers = [];
 
