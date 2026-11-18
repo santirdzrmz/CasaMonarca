@@ -158,8 +158,12 @@ class AuditEventApiTest extends TestCase
 
     public function test_admin_can_search_audit_events_by_metadata_and_resource_ids(): void
     {
+        // The search also matches the actor's name and email. Faker values often contain
+        // digits (e.g. "kschulist7@example.net"), which made `q=7` match both events.
         $admin = User::factory()->create([
             'role' => UserRole::Admin->value,
+            'name' => 'Audit Search Admin',
+            'email' => 'audit-search-admin@example.test',
         ]);
 
         AuditEvent::query()->create([
