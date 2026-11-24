@@ -65,7 +65,12 @@ final class RegistryEntryPresenter
 
         return array_merge(
             $entry->makeHidden(['payload_json', 'pending_payload_json'])->toArray(),
-            ['payload_locked' => true, 'payload_lock_reason' => $reason ?? 'role_not_allowed'],
+            [
+                'payload_json' => new \stdClass(),
+                'pending_payload_json' => null,
+                'payload_locked' => true,
+                'payload_lock_reason' => $reason ?? 'role_not_allowed',
+            ],
         );
     }
 

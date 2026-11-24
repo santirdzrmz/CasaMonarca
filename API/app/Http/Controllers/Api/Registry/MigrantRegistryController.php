@@ -50,30 +50,33 @@ class MigrantRegistryController extends Controller
                 ->where('created_by', $request->user()?->getKey())
                 ->latest('updated_at')
                 ->get()
-                ->each(function (MigrantRegistryEntry $entry): void {
+                ->map(function (MigrantRegistryEntry $entry) use ($request) {
                     $entry->setAttribute('expires_at', $entry->updated_at?->copy()->addDays(7));
-                }),
+
+                    return app(RegistryEntryPresenter::class)->present($entry, $request->user());
+                })
+                // A draft whose content this user cannot open (no keys) cannot be resumed: do not list it.
+                ->reject(fn ($entry) => is_array($entry) && ($entry['payload_locked'] ?? false))
+                ->values(),
         ]);
     }
 
     public function storeDraft(Request $request): JsonResponse
     {
         $payload = $request->validate(['payload_json' => ['required', 'array']])['payload_json'];
-        $entry = $this->service->createDraft($request->user(), $this->questionnaire->normalizePayload($payload, false));
+        $normalized = $this->questionnaire->normalizePayload($payload, false);
+        $entry = $this->service->createDraft($request->user(), $normalized);
 
-        return response()->json(['data' => $entry], 201);
+        return response()->json(['data' => $this->respond($request, $entry, $normalized)], 201);
     }
 
     public function updateDraft(Request $request, MigrantRegistryEntry $migrantRegistryEntry): JsonResponse
     {
         $payload = $request->validate(['payload_json' => ['required', 'array']])['payload_json'];
-        $entry = $this->service->updateDraft(
-            $request->user(),
-            $migrantRegistryEntry,
-            $this->questionnaire->normalizePayload($payload, false),
-        );
+        $normalized = $this->questionnaire->normalizePayload($payload, false);
+        $entry = $this->service->updateDraft($request->user(), $migrantRegistryEntry, $normalized);
 
-        return response()->json(['data' => $entry]);
+        return response()->json(['data' => $this->respond($request, $entry, $normalized)]);
     }
 
     public function discardDraft(Request $request, MigrantRegistryEntry $migrantRegistryEntry): JsonResponse
@@ -111,7 +114,7 @@ class MigrantRegistryController extends Controller
             throw $exception;
         }
 
-        return response()->json(['data' => $entry]);
+        return response()->json(['data' => $this->respond($request, $entry, $payload)]);
     }
 
     public function pendingApproval(Request $request): JsonResponse
@@ -148,7 +151,9 @@ class MigrantRegistryController extends Controller
                 ->where('current_status', MigrantRegistryService::STATUS_CHANGES_REQUESTED)
                 ->where('created_by', $request->user()?->getKey())
                 ->latest()
-                ->get(),
+                ->get()
+                ->map(fn (MigrantRegistryEntry $entry) => $this->respond($request, $entry))
+                ->values(),
         ]);
     }
 
@@ -182,7 +187,7 @@ class MigrantRegistryController extends Controller
         }
 
         return response()->json([
-            'data' => $entry,
+            'data' => $this->respond($request, $entry, $validated['payload_json']),
         ], 201);
     }
 
@@ -237,7 +242,7 @@ class MigrantRegistryController extends Controller
         }
 
         return response()->json([
-            'data' => $entry,
+            'data' => $this->respond($request, $entry, $validated['payload_json']),
         ]);
     }
 
@@ -261,7 +266,23 @@ class MigrantRegistryController extends Controller
         );
 
         return response()->json([
-            'data' => $entry,
+            'data' => app(RegistryEntryPresenter::class)->present($entry, $request->user()),
         ]);
+    }
+
+    /**
+     * Respond with the entry as the viewer is allowed to see it. When the stored payload is locked for this viewer
+     * (for example a volunteer, who holds no keys), echo back the payload they just submitted so the UI keeps working
+     * without decrypting anything.
+     */
+    private function respond(Request $request, MigrantRegistryEntry $entry, ?array $echo = null): mixed
+    {
+        $out = app(RegistryEntryPresenter::class)->present($entry, $request->user());
+
+        if (is_array($out) && $echo !== null && ($out['payload_locked'] ?? false)) {
+            $out['payload_json'] = $echo;
+        }
+
+        return $out;
     }
 }
