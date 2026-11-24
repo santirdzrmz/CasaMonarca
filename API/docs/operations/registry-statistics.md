@@ -48,6 +48,14 @@ Respuestas vacías cuentan como **"Sin respuesta"**, siempre al final y en gris.
 - `registry:synthetic` genera egresos para ~85 % de los aprobados (estancia de días a pocas semanas); los que caerían
   en el futuro siguen en albergue.
 
+### Exportar a CSV
+
+Botón **Descargar CSV** en los filtros. `GET /registry/migrants/statistics/export` (mismos parámetros que el tablero;
+solo `admin` y `coordinator`) devuelve una sola tabla larga `Sección, Mes, Categoría, Personas, Porcentaje` con BOM
+UTF-8 para Excel. Solo cifras agregadas, nunca registros individuales. Las celdas de texto que empiezan con `= + - @`
+llevan un apóstrofo (protección contra inyección de fórmulas). Cada descarga queda en la bitácora como
+`migrant.statistics.exported` con los filtros usados.
+
 ## 3. Diseño
 
 ### Estructura de la página

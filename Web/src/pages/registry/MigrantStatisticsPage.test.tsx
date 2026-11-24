@@ -9,7 +9,7 @@ import { MigrantStatisticsPage } from './MigrantStatisticsPage'
 
 vi.mock('../../lib/registryStatistics', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/registryStatistics')>()
-  return { ...actual, getRegistryStatistics: vi.fn() }
+  return { ...actual, downloadRegistryStatisticsCsv: vi.fn(), getRegistryStatistics: vi.fn() }
 })
 
 const user: AuthenticatedUser = {
@@ -188,5 +188,27 @@ describe('MigrantStatisticsPage', () => {
       expect(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[2]).toBe('in_shelter')
     })
     expect(screen.queryByRole('heading', { name: 'Egresos por mes' })).not.toBeInTheDocument()
+  })
+
+  it('downloads the CSV with the current filters', async () => {
+    const createObjectURL = vi.fn(() => 'blob:stats')
+    const revokeObjectURL = vi.fn()
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    Object.assign(URL, { createObjectURL, revokeObjectURL })
+    vi.mocked(statistics.downloadRegistryStatisticsCsv).mockResolvedValue({ blob: new Blob(['x']), filename: 'estadisticas.csv' })
+    render(<MigrantStatisticsPage user={user} />)
+    await screen.findByRole('heading', { name: 'Llegadas por mes' })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Egresados' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Descargar CSV' })).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: 'Descargar CSV' }))
+
+    await waitFor(() => expect(click).toHaveBeenCalled())
+    const [range, age, stay] = vi.mocked(statistics.downloadRegistryStatisticsCsv).mock.lastCall ?? []
+    expect(range).toEqual(vi.mocked(statistics.getRegistryStatistics).mock.lastCall?.[0])
+    expect(age).toEqual({ max: null, min: null })
+    expect(stay).toBe('exited')
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:stats')
+    click.mockRestore()
   })
 })

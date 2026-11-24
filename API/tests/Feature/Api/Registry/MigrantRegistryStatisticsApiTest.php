@@ -14,16 +14,27 @@ class MigrantRegistryStatisticsApiTest extends TestCase
     use RefreshDatabase;
 
     private const ATTENTION = 'ra09736a581f046c8aea75da8c905a1b9';
+
     private const GENDER = 'r8203ecd497f348c58e0f37ee52b0f281';
+
     private const COUNTRY = 'r64febf36f78743768d7049e10743d53f';
+
     private const CIVIL = 'rd7dd054b57a449bb8fc272fb5018b270';
+
     private const LITERACY = 'rf233bf6dce04426e869ab22c29187923';
+
     private const EDU_ADULT = 'rc4c93ad0575541cc8285754e6d11d9b0';
+
     private const EDU_MINOR = 'r65ec8fd31b8f421eb0d6c50bdd9115b3';
+
     private const MEXICO_ENTRY = 'rb5d53bd5db9045dd8fe0b1dc849acdf4';
+
     private const DESTINATION = 'r2bbdd2ae059d41b988ef4e55381fafde';
+
     private const SERVICES = 'r245485c3e8c5489ba5f554637d370ad7';
+
     private const AGE = 'rce625b31357e425ea492b6a99bce67c5';
+
     private const BIRTH = 'r1a57098392944e63882969e6150cdd98';
 
     private const URL = '/registry/migrants/statistics';
@@ -204,6 +215,29 @@ class MigrantRegistryStatisticsApiTest extends TestCase
 
         $this->actingAs($admin)->getJson($march.'&stay=exited')->assertJsonPath('data.total', 2);
         $this->actingAs($admin)->getJson($march.'&stay=gone')->assertStatus(422)->assertJsonValidationErrors('stay');
+    }
+
+    public function test_csv_export_uses_the_filters_neutralises_formulas_and_is_audited(): void
+    {
+        $this->entry(['attention' => '2026-03-01', 'gender' => 'Femenino', 'age' => '30']);
+        $this->entry(['attention' => '2026-03-02', 'country' => '=HYPERLINK("http://x")', 'age' => '31']);
+        $this->entry(['attention' => '2026-03-03', 'gender' => 'Masculino', 'age' => '70']);
+        $admin = $this->enrolled(UserRole::Admin);
+
+        $response = $this->actingAs($admin)->get(self::URL.'/export?from=2026-03-01&to=2026-03-31&age_min=18&age_max=59')->assertOk();
+
+        $this->assertStringStartsWith('text/csv', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString('estadisticas-registros-2026-03-01-a-2026-03-31.csv', $response->headers->get('Content-Disposition'));
+        $csv = $response->getContent();
+        $this->assertStringStartsWith("\u{FEFF}Sección,Mes,Categoría,Personas,Porcentaje\r\n", $csv);
+        $this->assertStringContainsString("Resumen,,Personas que llegaron,2,\r\n", $csv);
+        $this->assertStringContainsString("Filtros,,Edad máxima,59,\r\n", $csv);
+        $this->assertStringContainsString("Género,,Femenino,1,50.0\r\n", $csv);
+        $this->assertStringContainsString('"\'=HYPERLINK(""http://x"")"', $csv);
+        $this->assertStringNotContainsString(',=HYPERLINK', $csv);
+
+        $this->assertDatabaseHas('audit_events', ['event_type' => 'migrant.statistics.exported', 'actor_user_id' => $admin->id]);
+        $this->actingAs($this->enrolled(UserRole::Volunteer))->get(self::URL.'/export')->assertForbidden();
     }
 
     public function test_invalid_ranges_are_rejected(): void

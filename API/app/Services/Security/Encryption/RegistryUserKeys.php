@@ -76,6 +76,11 @@ class RegistryUserKeys
                 'replacedFingerprint' => $previous?->fingerprint,
                 'revokedGrants' => $revokedGrants,
                 'source' => $source,
+                'algorithms' => [
+                    'encryption' => CryptoAlgorithms::KEY_AGREEMENT_KEYPAIR,
+                    'signing' => CryptoAlgorithms::SIGNING_KEYPAIR,
+                    'keyFile' => CryptoAlgorithms::KEY_FILE,
+                ],
             ]);
 
             return ['replaced' => $previous?->fingerprint, 'revokedGrants' => $revokedGrants];

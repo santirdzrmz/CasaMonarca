@@ -125,6 +125,27 @@
   background: rgba(19, 35, 58, 0.1);
 }
 
+.viz-filters__download {
+  padding: 0.42rem 0.85rem;
+  border: 1px solid rgba(42, 120, 214, 0.45);
+  border-radius: 0.55rem;
+  background: #fff;
+  color: #1c5fae;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.viz-filters__download:hover:not(:disabled) {
+  background: rgba(42, 120, 214, 0.08);
+}
+
+.viz-filters__download:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .viz-filters__hint {
   font-size: 0.76rem;
   color: #a2361a;

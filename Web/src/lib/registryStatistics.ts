@@ -1,4 +1,4 @@
-import { apiFetch } from './api'
+import { apiFetch, ApiRequestError, buildApiUrl } from './api'
 
 export type StatisticsCategory = {
   count: number
@@ -90,11 +90,9 @@ export type AgeRange = { max: number | null; min: number | null }
 
 export const MISSING_ANSWER = 'Sin respuesta'
 
-export async function getRegistryStatistics(
-  range: { from?: string | null; to?: string | null },
-  age: AgeRange = { max: null, min: null },
-  stay: ShelterStay | null = null,
-) {
+type StatisticsRange = { from?: string | null; to?: string | null }
+
+const statisticsQuery = (range: StatisticsRange, age: AgeRange, stay: ShelterStay | null) => {
   const params = new URLSearchParams()
 
   if (range.from) {
@@ -118,9 +116,43 @@ export async function getRegistryStatistics(
   }
 
   const query = params.toString()
+
+  return query ? `?${query}` : ''
+}
+
+export async function getRegistryStatistics(
+  range: StatisticsRange,
+  age: AgeRange = { max: null, min: null },
+  stay: ShelterStay | null = null,
+) {
   const response = await apiFetch<{ data: RegistryStatistics }>(
-    `/registry/migrants/statistics${query ? `?${query}` : ''}`,
+    `/registry/migrants/statistics${statisticsQuery(range, age, stay)}`,
   )
 
   return response.data
+}
+
+/** CSV of the same aggregate figures, with the same filters. The server audits every download. */
+export async function downloadRegistryStatisticsCsv(
+  range: StatisticsRange,
+  age: AgeRange = { max: null, min: null },
+  stay: ShelterStay | null = null,
+): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch(buildApiUrl(`/registry/migrants/statistics/export${statisticsQuery(range, age, stay)}`), {
+    credentials: 'include',
+    headers: { Accept: 'text/csv' },
+  })
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { message?: unknown } | null
+    throw new ApiRequestError(
+      typeof payload?.message === 'string' ? payload.message : `Request failed with status ${response.status}`,
+      response.status,
+    )
+  }
+
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'estadisticas-registros.csv'
+
+  return { blob: await response.blob(), filename }
 }

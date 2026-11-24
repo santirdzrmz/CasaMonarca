@@ -2,6 +2,8 @@
 
 namespace App\Services\Security\Encryption;
 
+use App\Enums\AuditEventType;
+use App\Services\Audit\AuditEventService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
@@ -14,11 +16,14 @@ use Illuminate\Support\Facades\DB;
  */
 final class OperatorSessionKeys
 {
+    public function __construct(private readonly AuditEventService $audit) {}
+
     /** @return array{id: int, fingerprint: string, public: string, expires_at: string} */
     public function ensure(Request $request, int $userId): array
     {
         $hash = self::sessionHash($request);
         $pair = $this->secret($request);
+        $generated = $pair === null;
 
         if ($pair === null) {
             $box = sodium_crypto_box_keypair();
@@ -43,6 +48,16 @@ final class OperatorSessionKeys
         );
 
         $row = DB::table('registry_access_sessions')->where('user_id', $userId)->where('session_hash', $hash)->first();
+
+        if ($generated) {
+            $this->audit->success($request, AuditEventType::RegistryKeysSessionGenerated, $request->user(), ['type' => 'registry_access_session', 'id' => (int) $row->id], [
+                'algorithm' => CryptoAlgorithms::KEY_AGREEMENT_KEYPAIR,
+                'fingerprint' => $row->fingerprint,
+                'publicKey' => $row->public_key,
+                'expiresAt' => $expires->toIso8601String(),
+                'privateKeyStorage' => 'cache cifrado con APP_KEY; se borra al cerrar la sesión',
+            ]);
+        }
 
         return [
             'id' => (int) $row->id,

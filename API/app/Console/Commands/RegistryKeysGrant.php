@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\AuditEventType;
 use App\Models\User;
 use App\Services\Audit\AuditEventService;
+use App\Services\Security\Encryption\CryptoAlgorithms;
 use App\Services\Security\Encryption\EncryptionException;
 use App\Services\Security\Encryption\KeyGrants;
 use App\Services\Security\Encryption\PrivateKeyDirectory;
@@ -43,6 +44,7 @@ class RegistryKeysGrant extends Command
         $userPublic = (string) base64_decode($key->public_key, true);
         $expires = now()->addDays(max(1, (int) $this->option('days')));
         $granted = [];
+        $grantIds = [];
 
         foreach (array_filter(array_map('trim', explode(',', (string) $this->option('domains')))) as $domain) {
             $kekId = (string) config("registry_encryption.public_keys.$domain.id");
@@ -65,7 +67,7 @@ class RegistryKeysGrant extends Command
             sodium_memzero($secret);
 
             DB::table('registry_key_grants')->where('user_id', $user->getKey())->where('kek_id', $kekId)->whereNull('revoked_at')->update(['revoked_at' => now()]);
-            DB::table('registry_key_grants')->insert([
+            $grantIds[] = DB::table('registry_key_grants')->insertGetId([
                 'user_id' => $user->getKey(),
                 'kek_id' => $kekId,
                 'wrapped' => $wrapped,
@@ -81,7 +83,9 @@ class RegistryKeysGrant extends Command
             'email' => $user->email,
             'fingerprint' => $key->fingerprint,
             'kekIds' => $granted,
+            'grantIds' => $grantIds,
             'expiresAt' => $expires->toDateString(),
+            'keyAgreement' => CryptoAlgorithms::SEALED_BOX,
         ]);
 
         $this->info('Entregadas a '.$user->email.': '.implode(', ', $granted).' (vencen '.$expires->toDateString().').');

@@ -52,7 +52,10 @@ final class AccessGrantService
             'updated_at' => now(),
         ]);
 
-        $this->audit->success($http, AuditEventType::RegistryAccessRequested, $operator, ['type' => $resource, 'id' => $resourceId], ['grantId' => $id]);
+        $this->audit->success($http, AuditEventType::RegistryAccessRequested, $operator, ['type' => $resource, 'id' => $resourceId], [
+            'grantId' => $id,
+            'sessionFingerprint' => $session->fingerprint,
+        ]);
 
         return $id;
     }
@@ -120,6 +123,12 @@ final class AccessGrantService
 
         $this->audit->success($http, AuditEventType::RegistryAccessGranted, $signer, ['type' => $row->resource_type, 'id' => (int) $row->resource_id], [
             'grantId' => (int) $row->id, 'operatorId' => (int) $row->user_id, 'expiresAt' => $expires->toIso8601String(),
+            'sessionFingerprint' => $session->fingerprint,
+            'signerFingerprint' => DB::table('registry_user_keys')->where('user_id', $signer->getKey())->value('fingerprint'),
+            'keyAgreement' => CryptoAlgorithms::SEALED_BOX,
+            'wrappedPurposes' => array_keys($wrapped),
+            'signatureAlgorithm' => CryptoAlgorithms::SIGNATURE,
+            'signatureSha256' => hash('sha256', $signature),
         ]);
     }
 

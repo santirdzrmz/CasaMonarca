@@ -100,7 +100,25 @@ sustituye ese registro sin cambiar el resto.
 | `registry.keys.unlocked` / `.locked` / `.unlock.failed` | Web | Desbloqueo y bloqueo por sesión |
 | `registry.access.*` | Web | Accesos temporales de operadores (pedido, concedido, negado, revocado, usado) |
 
+| `registry.keys.session_generated` | Web (operador) | Huella y llave pública X25519 de la llave de sesión (Ks) |
+
+Los eventos de entrega, desbloqueo y acceso indican el acuerdo de llaves usado (`crypto_box_seal`: Diffie-Hellman
+X25519 con llave efímera + XSalsa20-Poly1305) y los de acceso la firma Ed25519 (con el SHA-256 de la firma).
 Nunca se registran llaves privadas ni contraseñas de archivos de llave.
+
+### Verificar la trazabilidad: `registry:keys-trace`
+
+Reporte de solo lectura (`--json` para máquina; sale con error si algo no cuadra). No confía solo en la bitácora:
+revisa los datos guardados.
+
+- **Llaves de dominio:** la llave pública del `.env` es la misma cuya generación quedó en la bitácora.
+- **Llaves personales:** historial completo y que cada huella se derive de sus llaves públicas.
+- **Diffie-Hellman:** cada sobre sellado (entregas de llaves y sobres de registros) empieza con una llave pública
+  X25519 efímera de 32 bytes; todas deben ser distintas, es decir, un intercambio por sobre. Un sobre copiado de otro
+  registro aparece como llave efímera repetida.
+- **Accesos temporales:** cada acceso concedido tiene una firma Ed25519 válida de una llave registrada del firmante
+  (también de llaves ya reemplazadas). Un acceso alterado aparece como firma inválida.
+- **Bitácora:** conteo y fecha del último evento de llaves y accesos.
 
 ## Puesta en marcha (en orden)
 

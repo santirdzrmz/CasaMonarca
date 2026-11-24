@@ -11,6 +11,7 @@ import { ApiRequestError } from '../../lib/api'
 import type { AuthenticatedUser } from '../../lib/auth'
 import { translate as t } from '../../lib/i18n'
 import {
+  downloadRegistryStatisticsCsv,
   getRegistryStatistics,
   MISSING_ANSWER,
   type AgeRange,
@@ -167,6 +168,8 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
   const [loading, setLoading] = useState(true)
   const [keysLocked, setKeysLocked] = useState(false)
   const [reloadCount, setReloadCount] = useState(0)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -256,6 +259,30 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
     if (next !== stay) {
       setLoading(true)
       setStay(next)
+    }
+  }
+
+  const downloadCsv = async () => {
+    setExporting(true)
+    setExportError(null)
+
+    try {
+      const { blob, filename } = await downloadRegistryStatisticsCsv(range, ageRange, stay)
+      const url = URL.createObjectURL(blob)
+      const link = window.document.createElement('a')
+      link.href = url
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (caught: unknown) {
+      if (caught instanceof ApiRequestError && caught.status === 401) {
+        onSessionExpired?.()
+        return
+      }
+
+      setExportError(caught instanceof Error ? caught.message : t('The CSV could not be downloaded.', 'No se pudo descargar el CSV.'))
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -454,6 +481,19 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
             </div>
           </div>
 
+          <div className="viz-filters__group viz-filters__export">
+            <span className="viz-filters__label">{t('Export', 'Exportar')}</span>
+            <button
+              className="viz-filters__download"
+              disabled={exporting || loading || ageInverted}
+              onClick={() => void downloadCsv()}
+              title={t('Aggregate figures with the current filters. The download is recorded in the audit log.', 'Cifras agregadas con los filtros actuales. La descarga queda en la bitácora.')}
+              type="button"
+            >
+              {exporting ? t('Preparing…', 'Preparando…') : t('Download CSV', 'Descargar CSV')}
+            </button>
+          </div>
+
           <label className="viz-filters__group">
             <span className="viz-filters__label">{t('Monthly breakdown by', 'Desglose mensual por')}</span>
             <select onChange={(event) => setStackKey(event.target.value as StatisticsDimensionKey)} value={stackKey}>
@@ -466,6 +506,7 @@ export function MigrantStatisticsPage({ onSessionExpired }: MigrantStatisticsPag
       </section>
 
       {error ? <div className="login-feedback login-feedback--error">{error}</div> : null}
+      {exportError ? <div className="login-feedback login-feedback--error" role="alert">{exportError}</div> : null}
 
       <div aria-busy={loading} className={`viz-body${loading ? ' viz-body--refreshing' : ''}`}>
         <section className="workspace-panel viz-kpis" aria-label={t('Summary', 'Resumen')}>

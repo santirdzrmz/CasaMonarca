@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Registry;
 use App\Enums\AuditEventType;
 use App\Http\Controllers\Controller;
 use App\Services\Audit\AuditEventService;
+use App\Services\Security\Encryption\CryptoAlgorithms;
 use App\Services\Security\Encryption\EncryptionException;
 use App\Services\Security\Encryption\KeyFile;
 use App\Services\Security\Encryption\KeyGrants;
@@ -12,6 +13,7 @@ use App\Services\Security\Encryption\PublicKeyKekProvider;
 use App\Services\Security\Encryption\RegistrySessionKeys;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -46,12 +48,14 @@ class RegistryKeysController extends Controller
         }
 
         $unlocked = [];
+        $openedGrants = [];
 
         foreach ($this->activeGrants((int) $request->user()->getKey()) as $grant) {
             $domainSecret = KeyGrants::unwrap($grant->wrapped, $secrets['box']);
 
             if ($domainSecret !== null && PublicKeyKekProvider::handles($grant->kek_id)) {
                 $unlocked[$grant->kek_id] = $domainSecret;
+                $openedGrants[] = (int) $grant->id;
             }
         }
 
@@ -68,7 +72,13 @@ class RegistryKeysController extends Controller
         }
 
         $this->sessionKeys->store($request->session()->getId(), $unlocked, (int) config('registry_encryption.session_key_ttl'));
-        $this->audit->success($request, AuditEventType::RegistryKeysUnlocked, $request->user(), [], ['kekIds' => array_values(array_diff(array_keys($unlocked), [RegistrySessionKeys::SIGNING_ENTRY]))]);
+        $this->audit->success($request, AuditEventType::RegistryKeysUnlocked, $request->user(), [], [
+            'kekIds' => array_values(array_diff(array_keys($unlocked), [RegistrySessionKeys::SIGNING_ENTRY])),
+            'grantIds' => $openedGrants,
+            'userFingerprint' => DB::table('registry_user_keys')->where('user_id', $request->user()->getKey())->value('fingerprint'),
+            'keyFile' => CryptoAlgorithms::KEY_FILE,
+            'keyAgreement' => CryptoAlgorithms::SEALED_BOX,
+        ]);
 
         return response()->json(['data' => $this->state($request)]);
     }
@@ -106,7 +116,7 @@ class RegistryKeysController extends Controller
         ];
     }
 
-    /** @return \Illuminate\Support\Collection<int, object> */
+    /** @return Collection<int, object> */
     private function activeGrants(int $userId)
     {
         $key = DB::table('registry_user_keys')->where('user_id', $userId)->whereNull('revoked_at')->exists();

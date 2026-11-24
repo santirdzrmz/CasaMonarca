@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\AuditEventType;
 use App\Services\Audit\AuditEventService;
 use App\Services\Security\Encryption\AgeCli;
+use App\Services\Security\Encryption\CryptoAlgorithms;
 use App\Services\Security\Encryption\EncryptionException;
 use App\Services\Security\Encryption\KeyGrants;
 use Illuminate\Console\Command;
@@ -65,6 +66,7 @@ class RegistryKeysInit extends Command
 
         app(AuditEventService::class)->console(AuditEventType::RegistryDomainKeysGenerated, [], [
             'generation' => $generation,
+            'algorithm' => CryptoAlgorithms::KEY_AGREEMENT_KEYPAIR,
             'publicKeys' => $publicKeys,
             'privateKeyProtection' => $recipient !== '' ? 'age' : 'plain',
         ]);

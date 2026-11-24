@@ -45,6 +45,7 @@ enum AuditEventType: string
     case RegistryKeysRevoked = 'registry.keys.revoked';
     case RegistryDomainKeysGenerated = 'registry.keys.domain_generated';
     case RegistryKeysRewrapped = 'registry.keys.rewrapped';
+    case RegistryKeysSessionGenerated = 'registry.keys.session_generated';
     case RegistryEncryptionBackfilled = 'registry.encryption.backfilled';
     case RegistryAccessRequested = 'registry.access.requested';
     case RegistryAccessGranted = 'registry.access.granted';
@@ -99,6 +100,7 @@ enum AuditEventType: string
     case MigrantRegistryPdfDownloaded = 'migrant.registry.pdf.downloaded';
     case MigrantRegistryExitRecorded = 'migrant.registry.exit.recorded';
     case MigrantRegistryExitUndone = 'migrant.registry.exit.undone';
+    case MigrantStatisticsExported = 'migrant.statistics.exported';
     case MigrantArcoRequested = 'migrant.arco.requested';
     case MigrantArcoChallengeStarted = 'migrant.arco.challenge.started';
     case MigrantArcoResolved = 'migrant.arco.resolved';
