@@ -51,8 +51,10 @@ Respuestas vacías cuentan como **"Sin respuesta"**, siempre al final y en gris.
 ### Exportar a CSV
 
 Botón **Descargar CSV** en los filtros. `GET /registry/migrants/statistics/export` (mismos parámetros que el tablero;
-solo `admin` y `coordinator`) devuelve una sola tabla larga `Sección, Mes, Categoría, Personas, Porcentaje` con BOM
-UTF-8 para Excel. Solo cifras agregadas, nunca registros individuales. Las celdas de texto que empiezan con `= + - @`
+solo `admin` y `coordinator`) devuelve un CSV con BOM UTF-8 para Excel, organizado en bloques de columnas lado a
+lado: la fila 1 nombra cada bloque (Filtros, Resumen, Por mes, Género, Nacionalidad, ...), la fila 2 trae sus
+encabezados (`Categoría, Personas, %`; en "Por mes": `Mes, Ingresos, Egresos`) y los datos bajan debajo, con una
+columna vacía entre bloques. Solo cifras agregadas, nunca registros individuales. Las celdas de texto que empiezan con `= + - @`
 llevan un apóstrofo (protección contra inyección de fórmulas). Cada descarga queda en la bitácora como
 `migrant.statistics.exported` con los filtros usados.
 

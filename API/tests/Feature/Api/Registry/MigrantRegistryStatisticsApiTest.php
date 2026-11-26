@@ -229,12 +229,28 @@ class MigrantRegistryStatisticsApiTest extends TestCase
         $this->assertStringStartsWith('text/csv', $response->headers->get('Content-Type'));
         $this->assertStringContainsString('estadisticas-registros-2026-03-01-a-2026-03-31.csv', $response->headers->get('Content-Disposition'));
         $csv = $response->getContent();
-        $this->assertStringStartsWith("\u{FEFF}Sección,Mes,Categoría,Personas,Porcentaje\r\n", $csv);
-        $this->assertStringContainsString("Resumen,,Personas que llegaron,2,\r\n", $csv);
-        $this->assertStringContainsString("Filtros,,Edad máxima,59,\r\n", $csv);
-        $this->assertStringContainsString("Género,,Femenino,1,50.0\r\n", $csv);
+        $this->assertStringStartsWith("\u{FEFF}Filtros,,,Resumen,,,,Por mes,,", $csv);
         $this->assertStringContainsString('"\'=HYPERLINK(""http://x"")"', $csv);
         $this->assertStringNotContainsString(',=HYPERLINK', $csv);
+
+        // Side-by-side blocks: row 1 has the block titles, row 2 its headers, data underneath; every row is as wide.
+        $rows = array_map(str_getcsv(...), explode("\r\n", rtrim(substr($csv, 3), "\r\n")));
+        $this->assertCount(1, array_unique(array_map('count', $rows)));
+        $block = function (string $title) use ($rows): array {
+            $x = array_search($title, $rows[0], true);
+            $this->assertNotFalse($x, "Missing block {$title}");
+
+            return array_map(fn (array $row): array => array_slice($row, $x, 3), array_slice($rows, 1));
+        };
+
+        $this->assertSame(['Filtro', 'Valor', ''], $block('Filtros')[0]);
+        $this->assertContains(['Edad máxima', '59', ''], $block('Filtros'));
+        $this->assertSame(['Indicador', 'Valor', '%'], $block('Resumen')[0]);
+        $this->assertContains(['Personas que llegaron', '2', ''], $block('Resumen'));
+        $this->assertSame(['Mes', 'Ingresos', 'Egresos'], $block('Por mes')[0]);
+        $this->assertContains(['2026-03', '2', '0'], $block('Por mes'));
+        $this->assertSame(['Género', 'Personas', '%'], $block('Género')[0]);
+        $this->assertContains(['Femenino', '1', '50.0'], $block('Género'));
 
         $this->assertDatabaseHas('audit_events', ['event_type' => 'migrant.statistics.exported', 'actor_user_id' => $admin->id]);
         $this->actingAs($this->enrolled(UserRole::Volunteer))->get(self::URL.'/export')->assertForbidden();
