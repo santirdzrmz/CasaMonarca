@@ -440,8 +440,7 @@ export function MigrantRegistrationsPage({ onNavigate, onSessionExpired, user }:
                   <span className="registry-browser__status">{formatRegistryValue(entry.current_status, t('Unknown status', 'Estado desconocido'))}</span>
                 </div>
               </div>
-
-              {user.role === 'non_coordinator' && entry.current_status === 'approved' ? (
+              {(user.role === 'admin' || user.role === 'coordinator') && entry.current_status === 'approved' ? (
                 <div className="registry-browser__actions">
                   <button
                     className="session-action session-action--quiet session-action--inline"

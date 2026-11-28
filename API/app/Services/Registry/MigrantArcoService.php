@@ -181,10 +181,68 @@ class MigrantArcoService
         $this->audit(AuditEventType::MigrantArcoRectificationApplied, $actor, $request, 'approved', 'approved', $request->resolution_reason);
     }
 
+        /** Campos del resumen que se conservan, sin vínculo con la persona, para estadísticas. */
+    private const ANONYMIZED_KEEP = ['countryOfOrigin', 'age', 'populationGroup', 'gender', 'civilStatus'];
+
+    /**
+     * Deja solo los datos estadísticos: sin nombre, teléfono, fecha de nacimiento, estado, notas ni otras respuestas.
+     * La fecha de atención se reduce al mes (día 01) para que siga siendo una fecha válida.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function anonymizedPayload(array $payload): array
+    {
+        $mapping = app(MigrantQuestionnaireDefinitionService::class)->definition()['summaryMappings'] ?? [];
+        $answers = is_array($payload['questionnaire']['answers'] ?? null) ? $payload['questionnaire']['answers'] : [];
+        $attention = preg_match('/^(\d{4})-(\d{2})-\d{2}/', (string) ($payload['attentionDate'] ?? ''), $m)
+            ? "{$m[1]}-{$m[2]}-01"
+            : '';
+
+        $keptAnswers = [];
+        foreach (self::ANONYMIZED_KEEP as $field) {
+            $questionId = $mapping[$field] ?? null;
+            if ($questionId && is_array($answers[$questionId] ?? null)) {
+                $answer = $answers[$questionId];
+                unset($answer['otherText']);
+                $keptAnswers[$questionId] = $answer;
+            }
+        }
+
+        $attentionId = $mapping['attentionDate'] ?? null;
+        if ($attentionId && $attention !== '' && is_array($answers[$attentionId] ?? null)) {
+            $answer = $answers[$attentionId];
+            $answer['value'] = $attention;
+            unset($answer['otherText']);
+            $keptAnswers[$attentionId] = $answer;
+        }
+
+        $out = [
+            'schemaVersion' => 2,
+            'questionnaire' => [
+                'definitionId' => $payload['questionnaire']['definitionId'] ?? MigrantQuestionnaireDefinitionService::DEFINITION_ID,
+                'answers' => $keptAnswers,
+            ],
+            'attentionDate' => $attention,
+            'anonymized' => true,
+        ];
+
+        foreach (self::ANONYMIZED_KEEP as $field) {
+            $out[$field] = $payload[$field] ?? '';
+        }
+
+        foreach (['firstName', 'firstLastName', 'secondLastName', 'fullName', 'phone', 'birthDate', 'departmentState', 'notes'] as $field) {
+            $out[$field] = '';
+        }
+
+        return $out;
+    }
+
     private function purgeRegistration(User $actor, MigrantArcoRequest $request): void
     {
         $entry = MigrantRegistryEntry::withTrashed()->whereKey($request->registry_entry_id)->lockForUpdate()->firstOrFail();
         $from = (string) $entry->current_status;
+        $anonymized = $this->anonymizedPayload(is_array($entry->payload_json) ? $entry->payload_json : []);
         $artifacts = MigrantArcoArtifact::query()->whereIn('arco_request_id', MigrantArcoRequest::query()->select('id')->where('registry_entry_id', $entry->id))->get();
 
         foreach ($artifacts as $artifact) {
@@ -220,28 +278,26 @@ class MigrantArcoService
             'original_payload_json_enc' => null,
             'proposed_payload_json_enc' => null,
         ]);
+
         $entry->forceFill([
-            'payload_json' => [],
+            'payload_json' => $anonymized,
             'pending_payload_json' => null,
             'pending_action' => null,
             'pending_requested_by' => null,
             'pending_requested_by_role' => null,
-            'current_status' => 'deleted_by_admin_arco',
+            'current_status' => 'anonymized_by_admin_arco',
             'current_assignee_role' => null,
         ])->save();
         MigrantRegistryStatusHistory::query()->create([
             'registry_entry_id' => $entry->id,
             'from_status' => $from,
-            'to_status' => 'deleted_by_admin_arco',
+            'to_status' => 'anonymized_by_admin_arco',
             'changed_by' => $actor->id,
             'changed_by_role' => $actor->role?->value ?? 'admin',
-            'reason' => 'Eliminación por Administrador (Derecho ARCO)',
+            'reason' => 'Anonimización por Administrador (Derecho ARCO)',
             'arco_request_id' => $request->id,
         ]);
-        if (! $entry->trashed()) {
-            $entry->delete();
-        }
-        $this->audit(AuditEventType::MigrantArcoArtifactsPurged, $actor, $request, $from, 'deleted_by_admin_arco', null, ['artifactCount' => $artifacts->count(), 'documentCount' => $documents->count()]);
+        $this->audit(AuditEventType::MigrantArcoArtifactsPurged, $actor, $request, $from, 'anonymized_by_admin_arco', null, ['artifactCount' => $artifacts->count(), 'documentCount' => $documents->count(), 'anonymized' => true]);
     }
 
     private function generateAccessBundle(User $actor, MigrantArcoRequest $request): string

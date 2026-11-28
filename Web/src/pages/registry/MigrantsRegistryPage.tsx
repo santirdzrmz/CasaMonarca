@@ -119,11 +119,12 @@ export function MigrantsRegistryPage({
           return
         }
 
+        const canCorrect = user.role === 'admin' || user.role === 'coordinator'
         const isAvailableCorrection = formMode === 'correction' &&
-          response.data.current_status === 'changes_requested' &&
-          response.data.created_by === user.id
+          canCorrect &&
+          response.data.current_status === 'changes_requested'
         const isAvailableEdit = formMode === 'edit' &&
-          user.role === 'non_coordinator' &&
+          canCorrect &&
           response.data.current_status === 'approved'
         const isAvailableDraft = formMode === 'draft' &&
           response.data.current_status === 'draft' &&
@@ -136,6 +137,15 @@ export function MigrantsRegistryPage({
             message: formMode === 'edit'
               ? 'This approved registration is not available for an edit request in your session.'
               : 'This registration is not available for correction in your session.',
+          })
+          return
+        }
+
+        if ((response.data as { payload_locked?: boolean }).payload_locked) {
+          setRequestedEntry(null)
+          setLoadError({
+            entryId: requestedEntryId,
+            message: 'Desbloquea tus llaves en Estadísticas antes de corregir este registro.',
           })
           return
         }

@@ -79,7 +79,10 @@ class MigrantRegistryStatisticsService
         $minMonth = null;
         $maxMonth = null;
 
-        $query = MigrantRegistryEntry::query()->where('current_status', MigrantRegistryService::STATUS_APPROVED);
+        $query = MigrantRegistryEntry::query()->whereIn('current_status', [
+            MigrantRegistryService::STATUS_APPROVED,
+            'anonymized_by_admin_arco',
+        ]);
 
         foreach ($query->lazyById(500) as $entry) {
             $answers = $this->answers($entry->payload_json);

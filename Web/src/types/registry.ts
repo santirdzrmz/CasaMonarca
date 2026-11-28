@@ -7,6 +7,7 @@ export type RegistryStatus =
   | 'pending_review'
   | 'pending_approval'
   | 'changes_requested'
+  | 'anonymized_by_admin_arco'
   | 'approved'
   | 'rejected'
   | 'deleted_by_admin'

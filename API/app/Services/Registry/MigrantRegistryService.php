@@ -200,9 +200,9 @@ class MigrantRegistryService
 
             if (
                 $entry->current_status === self::STATUS_CHANGES_REQUESTED &&
-                (int) $entry->created_by !== (int) $user->getKey()
+                ! in_array($user->role, [UserRole::Admin, UserRole::Coordinator], true)
             ) {
-                abort(403, 'Only the original submitter can correct this migrant registration.');
+                abort(403, 'Only a coordinator or administrator can correct this migrant registration.');
             }
 
             if (
@@ -212,31 +212,34 @@ class MigrantRegistryService
                 abort(409, 'Only approved migrant registrations can receive a new modification request.');
             }
 
+
             if (
                 $entry->current_status === self::STATUS_APPROVED &&
-                ($user->role ?? UserRole::default()) !== UserRole::NonCoordinator
+                ! in_array($user->role, [UserRole::Admin, UserRole::Coordinator], true)
             ) {
-                abort(403, 'Only non-coordinators can start a registration modification request.');
+                abort(403, 'Only a coordinator or administrator can start a registration modification request.');
             }
 
             $fromStatus = (string) $entry->current_status;
 
+            // Quien corrige o modifica es coordinación/administración (ya validado arriba):
+            // el cambio va directo a aprobación, sin regresar a revisión del operador.
             $entry->forceFill([
-                'current_status' => self::STATUS_PENDING_REVIEW,
-                'current_assignee_role' => 'non_coordinator',
+                'current_status' => self::STATUS_PENDING_APPROVAL,
+                'current_assignee_role' => 'coordinator',
                 'pending_action' => self::ACTION_UPDATE,
                 'pending_requested_by' => $user->id,
-                'pending_requested_by_role' => $user->role?->value ?? 'volunteer',
+                'pending_requested_by_role' => $user->role?->value ?? 'coordinator',
                 'pending_payload_json' => $payloadJson,
             ])->save();
 
             MigrantRegistryStatusHistory::create([
                 'registry_entry_id' => $entry->id,
                 'from_status' => $fromStatus,
-                'to_status' => self::STATUS_PENDING_REVIEW,
+                'to_status' => self::STATUS_PENDING_APPROVAL,
                 'changed_by' => $user->id,
-                'changed_by_role' => $user->role?->value ?? 'volunteer',
-                'reason' => 'Registration modification submitted for non-coordinator review',
+                'changed_by_role' => $user->role?->value ?? 'coordinator',
+                'reason' => 'Registration modification submitted by coordination for approval',
             ]);
 
             $this->auditService->success(
@@ -249,7 +252,7 @@ class MigrantRegistryService
                 ],
                 metadata: [
                     'previousStatus' => $fromStatus,
-                    'status' => self::STATUS_PENDING_REVIEW,
+                    'status' => self::STATUS_PENDING_APPROVAL,
                 ],
             );
 
@@ -313,7 +316,7 @@ class MigrantRegistryService
         return DB::transaction(function () use ($user, $entry, $reason) {
             $entry->forceFill([
                 'current_status' => self::STATUS_CHANGES_REQUESTED,
-                'current_assignee_role' => 'volunteer',
+                'current_assignee_role' => 'coordinator',
             ])->save();
 
             MigrantRegistryStatusHistory::create([

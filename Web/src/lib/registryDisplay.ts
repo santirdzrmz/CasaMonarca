@@ -15,6 +15,7 @@ const optionLabels: Record<string, () => string> = {
   coordinator: () => t('Coordinator', 'Coordinación'),
   deleted_by_admin: () => t('Deleted by administration', 'Eliminado por administración'),
   deleted_by_admin_arco: () => t('Deleted through an ARCO cancellation', 'Eliminado mediante cancelación ARCO'),
+  anonymized_by_admin_arco: () => t('Anonymized through an ARCO cancellation', 'Anonimizado mediante cancelación ARCO'),
   divorced: () => t('Divorced', 'Divorciado'),
   draft: () => t('Draft', 'Borrador'),
   edited_by_coordinator: () => t('Edited by coordination', 'Editado por coordinación'),

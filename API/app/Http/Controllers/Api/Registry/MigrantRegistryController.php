@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Registry;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreMigrantRegistryRequest;
 use App\Http\Requests\SubmitMigrantRegistryDraftRequest;
@@ -145,15 +146,18 @@ class MigrantRegistryController extends Controller
 
     public function corrections(Request $request): JsonResponse
     {
+        $canCorrect = in_array($request->user()?->role, [UserRole::Admin, UserRole::Coordinator], true);
+
         return response()->json([
-            'data' => MigrantRegistryEntry::query()
-                ->with(['creator:id,name,email,role', 'signatures', 'statusHistory'])
-                ->where('current_status', MigrantRegistryService::STATUS_CHANGES_REQUESTED)
-                ->where('created_by', $request->user()?->getKey())
-                ->latest()
-                ->get()
-                ->map(fn (MigrantRegistryEntry $entry) => $this->respond($request, $entry))
-                ->values(),
+            'data' => $canCorrect
+                ? MigrantRegistryEntry::query()
+                    ->with(['creator:id,name,email,role', 'signatures', 'statusHistory'])
+                    ->where('current_status', MigrantRegistryService::STATUS_CHANGES_REQUESTED)
+                    ->latest()
+                    ->get()
+                    ->map(fn (MigrantRegistryEntry $entry) => $this->respond($request, $entry))
+                    ->values()
+                : [],
         ]);
     }
 
